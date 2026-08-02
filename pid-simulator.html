@@ -1,0 +1,1211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asymptotic PID Lab</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #05080a;
+      --panel: #0a1014;
+      --card: #0d151a;
+      --card-2: #101b21;
+      --line: #20323c;
+      --grid: rgba(70, 196, 230, 0.10);
+      --cyan: #57d9ff;
+      --cyan-2: #1f9fc4;
+      --gold: #ffd36a;
+      --green: #67e8ad;
+      --red: #ff747e;
+      --text: #e8f1f4;
+      --muted: #81939c;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 78% 8%, rgba(31, 159, 196, 0.13), transparent 34rem),
+        radial-gradient(circle at 8% 92%, rgba(255, 211, 106, 0.06), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input { font: inherit; }
+
+    button { color: inherit; }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 25px 22px 30px;
+      background: rgba(7, 12, 15, 0.94);
+      border-right: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--cyan);
+      font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 0;
+      font-size: 21px;
+      letter-spacing: -0.035em;
+    }
+
+    .live-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 20px var(--green);
+    }
+
+    .formula {
+      position: relative;
+      margin-bottom: 22px;
+      padding: 16px 16px 15px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: linear-gradient(145deg, rgba(87, 217, 255, 0.07), rgba(255, 255, 255, 0.015));
+    }
+
+    .formula::after {
+      content: "";
+      position: absolute;
+      inset: auto -20% -70% 35%;
+      height: 100px;
+      background: radial-gradient(ellipse, rgba(87, 217, 255, 0.16), transparent 65%);
+      pointer-events: none;
+    }
+
+    .formula-main {
+      margin-bottom: 8px;
+      color: white;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 17px;
+      white-space: nowrap;
+    }
+
+    .formula-main sup { font-size: 10px; }
+
+    .formula-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .section { margin-top: 22px; }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 11px;
+      color: #b8c7cd;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .angle-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+
+    .angle-chip {
+      min-height: 34px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--card);
+      color: var(--muted);
+      cursor: pointer;
+      transition: 150ms ease;
+    }
+
+    .angle-chip:hover { border-color: var(--cyan-2); color: var(--text); }
+
+    .angle-chip.active {
+      border-color: rgba(255, 211, 106, 0.6);
+      background: rgba(255, 211, 106, 0.12);
+      color: var(--gold);
+      box-shadow: inset 0 0 18px rgba(255, 211, 106, 0.05);
+    }
+
+    .control-list { display: grid; gap: 12px; }
+
+    .control-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .control-name { color: #b9c7cc; font-size: 12px; }
+
+    .control-unit {
+      margin-left: 4px;
+      color: #53636b;
+      font-size: 10px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 70px;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 4px;
+      margin: 0;
+      border-radius: 999px;
+      appearance: none;
+      background: linear-gradient(90deg, var(--cyan-2), #273940);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      width: 15px;
+      height: 15px;
+      appearance: none;
+      border: 2px solid #071013;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px rgba(87, 217, 255, 0.45);
+      cursor: pointer;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+      background: #080d10;
+      color: var(--text);
+      font: 650 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-align: right;
+    }
+
+    input[type="number"]:focus { border-color: var(--cyan-2); }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #b9c7cc;
+      font-size: 12px;
+    }
+
+    .switch {
+      position: relative;
+      width: 38px;
+      height: 21px;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .switch span {
+      position: absolute;
+      inset: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #101a1f;
+      cursor: pointer;
+      transition: 150ms ease;
+    }
+
+    .switch span::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #60727a;
+      transition: 150ms ease;
+    }
+
+    .switch input:checked + span { border-color: var(--cyan-2); background: rgba(87, 217, 255, 0.14); }
+    .switch input:checked + span::after { transform: translateX(17px); background: var(--cyan); }
+
+    .button-stack {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .button-stack .primary { grid-column: 1 / -1; }
+
+    .btn {
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--card);
+      color: #b5c4ca;
+      font-size: 12px;
+      font-weight: 750;
+      cursor: pointer;
+      transition: 150ms ease;
+    }
+
+    .btn:hover { border-color: #3a5865; color: white; transform: translateY(-1px); }
+
+    .btn.primary {
+      border-color: #2bb7df;
+      background: linear-gradient(135deg, #1687a9, #1db8df);
+      color: #001217;
+      box-shadow: 0 12px 30px rgba(31, 159, 196, 0.2);
+    }
+
+    .btn.gold { border-color: rgba(255, 211, 106, 0.4); color: var(--gold); }
+
+    .main {
+      min-width: 0;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .topbar h2 {
+      margin-bottom: 5px;
+      font-size: clamp(22px, 3vw, 34px);
+      letter-spacing: -0.045em;
+    }
+
+    .topbar p { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 128px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(13, 21, 26, 0.75);
+      color: #b5c4ca;
+      font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+    .status-pill.running .dot { background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+    .status-pill.settled .dot { background: var(--green); box-shadow: 0 0 12px var(--green); }
+    .status-pill.timeout .dot { background: var(--red); box-shadow: 0 0 12px var(--red); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(13, 21, 26, 0.74);
+      box-shadow: var(--shadow);
+    }
+
+    .metric-label {
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      color: white;
+      font: 720 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .metric-value.cyan { color: var(--cyan); }
+    .metric-value.gold { color: var(--gold); }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(285px, 0.75fr);
+      gap: 14px;
+    }
+
+    .card {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background:
+        linear-gradient(rgba(13, 21, 26, 0.96), rgba(10, 17, 21, 0.96)),
+        repeating-linear-gradient(0deg, transparent, transparent 23px, var(--grid) 24px),
+        repeating-linear-gradient(90deg, transparent, transparent 23px, var(--grid) 24px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 15px 17px 0;
+    }
+
+    .card-title { margin: 0 0 4px; font-size: 14px; letter-spacing: -0.02em; }
+    .card-subtitle { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .card-tag {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--cyan);
+      font: 700 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .canvas-wrap { position: relative; height: 300px; padding: 8px 10px 10px; }
+    .canvas-wrap.short { height: 230px; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    .pose-card { display: flex; flex-direction: column; }
+
+    .pose-stage {
+      position: relative;
+      flex: 1;
+      min-height: 300px;
+      display: grid;
+      place-items: center;
+      padding: 10px 20px 15px;
+    }
+
+    .pose-stage svg { width: min(100%, 300px); height: auto; overflow: visible; }
+
+    .dial-grid { stroke: #18313b; stroke-width: 1; fill: none; }
+    .dial-axis { stroke: #28434e; stroke-width: 1; }
+    .target-ray { stroke: var(--gold); stroke-width: 2; stroke-dasharray: 5 5; }
+    .current-ray { stroke: var(--cyan); stroke-width: 2.5; filter: drop-shadow(0 0 5px rgba(87, 217, 255, 0.6)); }
+    .sweep { fill: rgba(87, 217, 255, 0.07); stroke: rgba(87, 217, 255, 0.25); stroke-width: 1; }
+    .robot-body { fill: #111a1e; stroke: var(--gold); stroke-width: 3; }
+    .robot-front { stroke: var(--cyan); stroke-width: 3; stroke-linecap: round; }
+    .robot-wheel { fill: #52656d; }
+
+    .pose-readout {
+      position: absolute;
+      right: 16px;
+      bottom: 14px;
+      text-align: right;
+    }
+
+    .pose-readout strong { display: block; color: var(--gold); font: 750 23px ui-monospace, monospace; }
+    .pose-readout span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; }
+
+    .wide { grid-column: 1 / -1; }
+
+    .split-charts {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .exit-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 0 17px 14px;
+    }
+
+    .exit-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font: 700 9px ui-monospace, monospace;
+      text-transform: uppercase;
+    }
+
+    .exit-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+    .exit-badge.done::before { background: var(--green); }
+
+    .export-box {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #070b0e;
+    }
+
+    .export-box pre {
+      margin: 0;
+      overflow: auto;
+      color: #9fb0b7;
+      font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+    }
+
+    .export-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .copy-link {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--cyan);
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .model-note {
+      margin: 12px 0 0;
+      color: #64757c;
+      font-size: 10px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 300px minmax(0, 1fr); }
+      .dashboard { grid-template-columns: 1fr; }
+      .pose-card, .gain-card { grid-column: 1; }
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .sidebar { position: relative; width: 100%; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .main { padding: 16px; }
+      .topbar { align-items: flex-start; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .split-charts { grid-template-columns: 1fr; }
+      .canvas-wrap { height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div>
+          <p class="eyebrow">2029C motion model</p>
+          <h1>Asymptotic PID Lab</h1>
+        </div>
+        <span class="live-dot" aria-hidden="true"></span>
+      </div>
+
+      <div class="formula">
+        <div class="formula-main">k<sub>P</sub>(s) = (f − i) · |s|<sup>p</sup> / (|s|<sup>p</sup> + k<sup>p</sup>) + i</div>
+        <p class="formula-note">The proportional gain is selected from the command angle once, then held for the complete turn.</p>
+      </div>
+
+      <section class="section">
+        <div class="section-title"><span>Command angle</span><span id="selectedAngleText">90°</span></div>
+        <div class="angle-grid" id="angleGrid"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><span>Asymptotic gain</span><span id="gainPreview">kP 0.00</span></div>
+        <div class="control-list" id="gainControls"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><span>PID and exits</span><span>10 ms</span></div>
+        <div class="control-list" id="pidControls"></div>
+        <div class="switch-row" style="margin-top: 13px;">
+          <span>Integral sign reset</span>
+          <label class="switch"><input id="signReset" type="checkbox" checked><span></span></label>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><span>Robot response model</span><span>adjustable</span></div>
+        <div class="control-list" id="modelControls"></div>
+      </section>
+
+      <div class="button-stack">
+        <button class="btn primary" id="runButton">Run turn simulation</button>
+        <button class="btn" id="pauseButton">Pause</button>
+        <button class="btn" id="stepButton">Step 10 ms</button>
+        <button class="btn gold" id="resetButton">Reset</button>
+      </div>
+
+      <div class="export-box">
+        <div class="export-row"><span>C++ profile</span><button class="copy-link" id="copyButton">Copy</button></div>
+        <pre id="configOutput"></pre>
+      </div>
+      <p class="model-note">This runs the library's exact PID math. Motor acceleration, damping, and friction are a tunable approximation; match those controls to measured robot data before treating predicted timing as physical truth.</p>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Interactive response workspace</p>
+          <h2>Turn response across command angles</h2>
+          <p>Compare 10° through 180°, inspect the selected gain, then export the profile.</p>
+        </div>
+        <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusText">READY</span></div>
+      </header>
+
+      <section class="metrics">
+        <div class="metric"><div class="metric-label">Target</div><div class="metric-value gold" id="metricTarget">90.0°</div></div>
+        <div class="metric"><div class="metric-label">Heading</div><div class="metric-value" id="metricHeading">0.0°</div></div>
+        <div class="metric"><div class="metric-label">Error</div><div class="metric-value" id="metricError">90.0°</div></div>
+        <div class="metric"><div class="metric-label">Output</div><div class="metric-value cyan" id="metricOutput">0.0</div></div>
+        <div class="metric"><div class="metric-label">Selected kP</div><div class="metric-value cyan" id="metricGain">0.00</div></div>
+      </section>
+
+      <section class="dashboard">
+        <article class="card gain-card">
+          <div class="card-head">
+            <div><h3 class="card-title">Asymptotic proportional curve</h3><p class="card-subtitle">Markers show the tested command angles; gold is the active command.</p></div>
+            <span class="card-tag">gain / degrees</span>
+          </div>
+          <div class="canvas-wrap"><canvas id="gainCanvas"></canvas></div>
+        </article>
+
+        <article class="card pose-card">
+          <div class="card-head">
+            <div><h3 class="card-title">Robot heading</h3><p class="card-subtitle">Cyan is current heading; gold is the target.</p></div>
+            <span class="card-tag" id="simTimeTag">0.00 s</span>
+          </div>
+          <div class="pose-stage">
+            <svg viewBox="-150 -150 300 300" role="img" aria-label="Top-down robot heading simulation">
+              <circle class="dial-grid" r="118"></circle>
+              <circle class="dial-grid" r="82"></circle>
+              <circle class="dial-grid" r="45"></circle>
+              <line class="dial-axis" x1="-128" y1="0" x2="128" y2="0"></line>
+              <line class="dial-axis" x1="0" y1="-128" x2="0" y2="128"></line>
+              <path class="sweep" id="sweepPath" d=""></path>
+              <g id="targetRay"><line class="target-ray" x1="0" y1="0" x2="0" y2="-126"></line><circle cx="0" cy="-126" r="4" fill="#ffd36a"></circle></g>
+              <g id="currentRay"><line class="current-ray" x1="0" y1="0" x2="0" y2="-110"></line></g>
+              <g id="robotGroup">
+                <rect class="robot-body" x="-32" y="-42" width="64" height="84" rx="8"></rect>
+                <rect class="robot-wheel" x="-39" y="-27" width="8" height="23" rx="2"></rect>
+                <rect class="robot-wheel" x="31" y="-27" width="8" height="23" rx="2"></rect>
+                <rect class="robot-wheel" x="-39" y="8" width="8" height="23" rx="2"></rect>
+                <rect class="robot-wheel" x="31" y="8" width="8" height="23" rx="2"></rect>
+                <line class="robot-front" x1="-16" y1="-31" x2="16" y2="-31"></line>
+              </g>
+            </svg>
+            <div class="pose-readout"><strong id="poseAngle">0.0°</strong><span>current heading</span></div>
+          </div>
+          <div class="exit-strip">
+            <span class="exit-badge" id="errorBadge">error exit</span>
+            <span class="exit-badge" id="velocityBadge">velocity exit</span>
+            <span class="exit-badge" id="timeBadge">timeout</span>
+          </div>
+        </article>
+
+        <article class="card wide">
+          <div class="card-head">
+            <div><h3 class="card-title">Normalized angle response</h3><p class="card-subtitle">Every preset is simulated with the same profile; 100% is its own commanded angle.</p></div>
+            <span class="card-tag">% target / time</span>
+          </div>
+          <div class="canvas-wrap"><canvas id="responseCanvas"></canvas></div>
+        </article>
+
+        <div class="split-charts">
+          <article class="card">
+            <div class="card-head">
+              <div><h3 class="card-title">Angular velocity</h3><p class="card-subtitle">Selected command response in degrees per second.</p></div>
+              <span class="card-tag">deg/s</span>
+            </div>
+            <div class="canvas-wrap short"><canvas id="velocityCanvas"></canvas></div>
+          </article>
+          <article class="card">
+            <div class="card-head">
+              <div><h3 class="card-title">Motor command</h3><p class="card-subtitle">Raw PID is clamped to the signed −127…127 scale.</p></div>
+              <span class="card-tag">output</span>
+            </div>
+            <div class="canvas-wrap short"><canvas id="outputCanvas"></canvas></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    "use strict";
+
+    const DT = 0.01;
+    const ANGLES = [10, 20, 30, 45, 60, 90, 135, 180];
+    const COLORS = ["#3b8298", "#3f94ad", "#42a6c2", "#46b8d6", "#4dc9e9", "#57d9ff", "#8bbfd1", "#b7c9cf"];
+
+    const params = {
+      target: 90,
+      initial: 5.08,
+      final: 2.328333,
+      scale: 28,
+      power: 1.7,
+      kI: 21.166667,
+      kD: 0.127,
+      integralRange: 5,
+      signReset: true,
+      maxOutput: 127,
+      timeout: 2000,
+      errorExit: 4,
+      velocityExit: 3,
+      motorAccel: 900,
+      damping: 4.5,
+      friction: 5
+    };
+
+    const controlGroups = {
+      gainControls: [
+        ["target", "Custom command", "deg", 1, 180, 1],
+        ["initial", "Initial gain", "", 0, 12, 0.01],
+        ["final", "Final gain", "", 0, 12, 0.01],
+        ["scale", "Scale / midpoint", "deg", 1, 180, 1],
+        ["power", "Transition power", "", 0.2, 4, 0.05]
+      ],
+      pidControls: [
+        ["kI", "Integral gain", "", 0, 50, 0.01],
+        ["kD", "Derivative gain", "", 0, 2, 0.001],
+        ["integralRange", "Integral range", "deg", 0, 30, 0.1],
+        ["maxOutput", "Maximum output", "±", 1, 127, 1],
+        ["timeout", "Timeout", "ms", 100, 6000, 100],
+        ["errorExit", "Error exit", "deg", 0, 20, 0.1],
+        ["velocityExit", "Velocity exit", "deg/s", 0, 30, 0.5]
+      ],
+      modelControls: [
+        ["motorAccel", "Motor acceleration", "deg/s²", 100, 1800, 10],
+        ["damping", "Drivetrain damping", "/s", 0.2, 12, 0.1],
+        ["friction", "Static friction", "output", 0, 30, 0.5]
+      ]
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+    const signbit = (value) => value < 0 || Object.is(value, -0);
+    const format = (value, digits = 1) => Number.isFinite(value) ? value.toFixed(digits) : "—";
+
+    function angleError(target, current) {
+      let error = target - current;
+      while (error > 180) error -= 360;
+      while (error < -180) error += 360;
+      return error;
+    }
+
+    function gainAt(setpoint) {
+      const magnitude = Math.pow(Math.abs(setpoint), params.power);
+      const scaleMagnitude = Math.pow(Math.abs(params.scale), params.power);
+      const denominator = magnitude + scaleMagnitude;
+      if (denominator === 0) return params.initial;
+      return (params.final - params.initial) * magnitude / denominator + params.initial;
+    }
+
+    function renderControls() {
+      Object.entries(controlGroups).forEach(([containerId, controls]) => {
+        const container = $(containerId);
+        container.innerHTML = controls.map(([key, name, unit, min, max, step]) => `
+          <label class="control">
+            <span class="control-head"><span class="control-name">${name}<span class="control-unit">${unit}</span></span></span>
+            <span class="control-row">
+              <input type="range" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${params[key]}">
+              <input type="number" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${params[key]}">
+            </span>
+          </label>`).join("");
+      });
+
+      document.querySelectorAll("[data-param]").forEach((input) => {
+        input.addEventListener("input", () => {
+          const key = input.dataset.param;
+          const value = Number(input.value);
+          if (!Number.isFinite(value)) return;
+          params[key] = value;
+          document.querySelectorAll(`[data-param="${key}"]`).forEach((peer) => {
+            if (peer !== input) peer.value = value;
+          });
+          scheduleRecompute();
+        });
+      });
+    }
+
+    function renderAngleButtons() {
+      document.querySelectorAll('[data-param="target"]').forEach((input) => { input.value = params.target; });
+      $("angleGrid").innerHTML = ANGLES.map((angle) =>
+        `<button class="angle-chip${angle === params.target ? " active" : ""}" data-angle="${angle}">${angle}°</button>`
+      ).join("");
+      document.querySelectorAll("[data-angle]").forEach((button) => {
+        button.addEventListener("click", () => {
+          params.target = Number(button.dataset.angle);
+          renderAngleButtons();
+          scheduleRecompute();
+        });
+      });
+    }
+
+    function makeState(target) {
+      const error = angleError(target, 0);
+      return {
+        target,
+        t: 0,
+        angle: 0,
+        omega: 0,
+        integral: 0,
+        previousError: error,
+        gain: gainAt(error),
+        output: 0,
+        rawOutput: 0,
+        error,
+        reason: "ready",
+        running: false,
+        data: [{ t: 0, angle: 0, error, omega: 0, output: 0, rawOutput: 0 }]
+      };
+    }
+
+    function stepState(state, record = true) {
+      if (state.reason === "settled" || state.reason === "timeout") return false;
+
+      const error = angleError(state.target, state.angle);
+      if (Math.abs(error) > params.integralRange) {
+        state.integral = 0;
+      } else if (params.signReset && signbit(error) !== signbit(state.previousError)) {
+        state.integral = 0;
+      } else {
+        state.integral += error * DT;
+      }
+
+      const derivative = (error - state.previousError) * 100;
+      state.previousError = error;
+      state.rawOutput = state.gain * error + params.kI * state.integral + params.kD * derivative;
+      state.output = clamp(state.rawOutput, -params.maxOutput, params.maxOutput);
+
+      const magnitude = Math.abs(state.output);
+      const effective = magnitude <= params.friction
+        ? 0
+        : Math.sign(state.output) * (magnitude - params.friction) * 127 / Math.max(1, 127 - params.friction);
+      const acceleration = params.motorAccel * effective / 127 - params.damping * state.omega;
+      state.omega += acceleration * DT;
+      state.angle += state.omega * DT;
+      state.t += DT;
+      state.error = angleError(state.target, state.angle);
+
+      if (record) {
+        state.data.push({
+          t: state.t,
+          angle: state.angle,
+          error: state.error,
+          omega: state.omega,
+          output: state.output,
+          rawOutput: state.rawOutput
+        });
+      }
+
+      const timedOut = state.t * 1000 >= params.timeout;
+      const errorActive = Math.abs(state.error) > params.errorExit;
+      const velocityActive = Math.abs(state.omega) > params.velocityExit;
+      if (timedOut) state.reason = "timeout";
+      else if (!errorActive && !velocityActive) state.reason = "settled";
+      else state.reason = "running";
+      return state.reason === "running";
+    }
+
+    function simulate(target) {
+      const state = makeState(target);
+      const maximumSteps = Math.ceil(params.timeout / (DT * 1000)) + 2;
+      for (let index = 0; index < maximumSteps; index += 1) {
+        if (!stepState(state)) break;
+      }
+      return state;
+    }
+
+    let simulation = makeState(params.target);
+    let predictions = [];
+    let recomputeQueued = false;
+    let accumulator = 0;
+    let previousFrame = performance.now();
+
+    function scheduleRecompute() {
+      if (recomputeQueued) return;
+      recomputeQueued = true;
+      requestAnimationFrame(() => {
+        recomputeQueued = false;
+        resetSimulation();
+      });
+    }
+
+    function resetSimulation() {
+      simulation = makeState(params.target);
+      predictions = ANGLES.map(simulate);
+      accumulator = 0;
+      renderAngleButtons();
+      renderAll();
+    }
+
+    function runSimulation() {
+      simulation = makeState(params.target);
+      simulation.running = true;
+      simulation.reason = "running";
+      accumulator = 0;
+      previousFrame = performance.now();
+      renderAll();
+    }
+
+    function togglePause() {
+      if (simulation.reason === "settled" || simulation.reason === "timeout") return;
+      simulation.running = !simulation.running;
+      simulation.reason = simulation.running ? "running" : "paused";
+      $("pauseButton").textContent = simulation.running ? "Pause" : "Resume";
+      previousFrame = performance.now();
+      renderAll();
+    }
+
+    function manualStep() {
+      if (simulation.reason === "settled" || simulation.reason === "timeout") simulation = makeState(params.target);
+      simulation.running = false;
+      stepState(simulation);
+      if (simulation.reason === "running") simulation.reason = "paused";
+      renderAll();
+    }
+
+    function prepareCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const width = Math.max(10, rect.width);
+      const height = Math.max(10, rect.height);
+      const pixelWidth = Math.round(width * dpr);
+      const pixelHeight = Math.round(height * dpr);
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+      }
+      const context = canvas.getContext("2d");
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.clearRect(0, 0, width, height);
+      return { context, width, height };
+    }
+
+    function chart(canvas, options) {
+      const { context: ctx, width, height } = prepareCanvas(canvas);
+      const pad = { left: 48, right: 18, top: 18, bottom: 31 };
+      const plotWidth = Math.max(1, width - pad.left - pad.right);
+      const plotHeight = Math.max(1, height - pad.top - pad.bottom);
+      const xMap = (x) => pad.left + (x - options.xMin) / Math.max(1e-9, options.xMax - options.xMin) * plotWidth;
+      const yMap = (y) => pad.top + (options.yMax - y) / Math.max(1e-9, options.yMax - options.yMin) * plotHeight;
+
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.fillStyle = "#667981";
+      ctx.strokeStyle = "rgba(72, 125, 145, 0.20)";
+
+      const xTicks = options.xTicks || 5;
+      const yTicks = options.yTicks || 5;
+      for (let tick = 0; tick <= xTicks; tick += 1) {
+        const ratio = tick / xTicks;
+        const x = pad.left + ratio * plotWidth;
+        ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotHeight); ctx.stroke();
+        const value = options.xMin + ratio * (options.xMax - options.xMin);
+        ctx.textAlign = "center";
+        ctx.fillText(options.xFormat ? options.xFormat(value) : format(value, 1), x, height - 9);
+      }
+      for (let tick = 0; tick <= yTicks; tick += 1) {
+        const ratio = tick / yTicks;
+        const y = pad.top + ratio * plotHeight;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + plotWidth, y); ctx.stroke();
+        const value = options.yMax - ratio * (options.yMax - options.yMin);
+        ctx.textAlign = "right";
+        ctx.fillText(options.yFormat ? options.yFormat(value) : format(value, 1), pad.left - 8, y + 3);
+      }
+
+      if (options.zeroLine && options.yMin < 0 && options.yMax > 0) {
+        ctx.strokeStyle = "rgba(225, 239, 244, 0.35)";
+        ctx.beginPath(); ctx.moveTo(pad.left, yMap(0)); ctx.lineTo(pad.left + plotWidth, yMap(0)); ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.rect(pad.left, pad.top, plotWidth, plotHeight);
+      ctx.clip();
+      options.series.forEach((series) => {
+        if (!series.data || series.data.length < 2) return;
+        ctx.beginPath();
+        series.data.forEach((point, index) => {
+          const x = xMap(point.x);
+          const y = yMap(point.y);
+          if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = series.color;
+        ctx.globalAlpha = series.alpha ?? 1;
+        ctx.lineWidth = series.width || 2;
+        ctx.setLineDash(series.dash || []);
+        ctx.stroke();
+      });
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      ctx.setLineDash([]);
+      return { ctx, xMap, yMap, pad, plotWidth, plotHeight };
+    }
+
+    function drawGainChart() {
+      const maxAngle = Math.max(180, params.target);
+      const points = [];
+      for (let angle = 0; angle <= maxAngle; angle += Math.max(0.5, maxAngle / 240)) {
+        points.push({ x: angle, y: gainAt(angle) });
+      }
+      const low = Math.min(params.initial, params.final);
+      const high = Math.max(params.initial, params.final);
+      const margin = Math.max(0.3, (high - low) * 0.24);
+      const result = chart($("gainCanvas"), {
+        xMin: 0, xMax: maxAngle, yMin: Math.max(0, low - margin), yMax: high + margin,
+        xFormat: (value) => `${Math.round(value)}°`,
+        yFormat: (value) => format(value, 2),
+        series: [{ data: points, color: "#57d9ff", width: 2.5 }]
+      });
+      const { ctx, xMap, yMap } = result;
+      ANGLES.filter((angle) => angle <= maxAngle).forEach((angle) => {
+        ctx.beginPath();
+        ctx.arc(xMap(angle), yMap(gainAt(angle)), angle === params.target ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = angle === params.target ? "#ffd36a" : "#7b939d";
+        ctx.fill();
+      });
+      ctx.strokeStyle = "rgba(255, 211, 106, 0.5)";
+      ctx.setLineDash([4, 5]);
+      ctx.beginPath(); ctx.moveTo(xMap(params.target), result.pad.top); ctx.lineTo(xMap(params.target), result.pad.top + result.plotHeight); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function responseSeries() {
+      const series = predictions.map((prediction, index) => ({
+        data: prediction.data.map((point) => ({ x: point.t, y: prediction.target === 0 ? 0 : point.angle / prediction.target * 100 })),
+        color: prediction.target === params.target ? "#ffd36a" : COLORS[index],
+        alpha: prediction.target === params.target ? 0.95 : 0.42,
+        width: prediction.target === params.target ? 2.5 : 1.2
+      }));
+      if (simulation.data.length > 1) {
+        series.push({
+          data: simulation.data.map((point) => ({ x: point.t, y: point.angle / simulation.target * 100 })),
+          color: "#ffffff", width: 2.4
+        });
+      }
+      return series;
+    }
+
+    function drawResponseChart() {
+      const values = predictions.flatMap((prediction) => prediction.data.map((point) => point.angle / prediction.target * 100));
+      const yMin = Math.min(-15, ...values);
+      const yMax = Math.max(115, ...values);
+      const result = chart($("responseCanvas"), {
+        xMin: 0, xMax: params.timeout / 1000, yMin, yMax,
+        xFormat: (value) => `${format(value, 1)}s`,
+        yFormat: (value) => `${Math.round(value)}%`,
+        zeroLine: true,
+        series: responseSeries()
+      });
+      const { ctx, yMap, pad, plotWidth } = result;
+      ctx.strokeStyle = "rgba(103, 232, 173, 0.42)";
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(pad.left, yMap(100)); ctx.lineTo(pad.left + plotWidth, yMap(100)); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function selectedData() {
+      if (simulation.data.length > 1) return simulation.data;
+      return predictions.find((prediction) => prediction.target === params.target)?.data || simulation.data;
+    }
+
+    function symmetricLimit(data, key, minimum) {
+      const maximum = Math.max(minimum, ...data.map((point) => Math.abs(point[key])));
+      return maximum * 1.12;
+    }
+
+    function drawVelocityChart() {
+      const data = selectedData();
+      const limit = symmetricLimit(data, "omega", 20);
+      chart($("velocityCanvas"), {
+        xMin: 0, xMax: params.timeout / 1000, yMin: -limit, yMax: limit,
+        xFormat: (value) => `${format(value, 1)}s`, yFormat: (value) => `${Math.round(value)}`,
+        zeroLine: true,
+        series: [{ data: data.map((point) => ({ x: point.t, y: point.omega })), color: "#57d9ff", width: 2.2 }]
+      });
+    }
+
+    function drawOutputChart() {
+      const data = selectedData();
+      chart($("outputCanvas"), {
+        xMin: 0, xMax: params.timeout / 1000, yMin: -127, yMax: 127,
+        xFormat: (value) => `${format(value, 1)}s`, yFormat: (value) => `${Math.round(value)}`,
+        zeroLine: true,
+        series: [
+          { data: data.map((point) => ({ x: point.t, y: clamp(point.rawOutput, -180, 180) })), color: "#62747b", width: 1.2, dash: [4, 4] },
+          { data: data.map((point) => ({ x: point.t, y: point.output })), color: "#ffd36a", width: 2.2 }
+        ]
+      });
+    }
+
+    function polarPoint(angle, radius) {
+      const radians = (angle - 90) * Math.PI / 180;
+      return { x: Math.cos(radians) * radius, y: Math.sin(radians) * radius };
+    }
+
+    function sweepPath(angle) {
+      const normalized = clamp(angle, -359.9, 359.9);
+      if (Math.abs(normalized) < 0.01) return "";
+      const start = polarPoint(0, 74);
+      const end = polarPoint(normalized, 74);
+      const large = Math.abs(normalized) > 180 ? 1 : 0;
+      const sweep = normalized >= 0 ? 1 : 0;
+      return `M 0 0 L ${start.x} ${start.y} A 74 74 0 ${large} ${sweep} ${end.x} ${end.y} Z`;
+    }
+
+    function updatePose() {
+      $("targetRay").setAttribute("transform", `rotate(${params.target})`);
+      $("currentRay").setAttribute("transform", `rotate(${simulation.angle})`);
+      $("robotGroup").setAttribute("transform", `rotate(${simulation.angle})`);
+      $("sweepPath").setAttribute("d", sweepPath(simulation.angle));
+      $("poseAngle").textContent = `${format(simulation.angle, 1)}°`;
+      $("simTimeTag").textContent = `${format(simulation.t, 2)} s`;
+    }
+
+    function updateExitBadges() {
+      const errorDone = Math.abs(simulation.error) <= params.errorExit;
+      const velocityDone = Math.abs(simulation.omega) <= params.velocityExit;
+      const timeOkay = simulation.t * 1000 < params.timeout;
+      $("errorBadge").classList.toggle("done", errorDone);
+      $("velocityBadge").classList.toggle("done", velocityDone);
+      $("timeBadge").classList.toggle("done", timeOkay);
+    }
+
+    function updateMetrics() {
+      $("selectedAngleText").textContent = `${params.target}°`;
+      $("gainPreview").textContent = `kP ${format(gainAt(params.target), 3)}`;
+      $("metricTarget").textContent = `${format(params.target, 1)}°`;
+      $("metricHeading").textContent = `${format(simulation.angle, 1)}°`;
+      $("metricError").textContent = `${format(simulation.error, 1)}°`;
+      $("metricOutput").textContent = format(simulation.output, 1);
+      $("metricGain").textContent = format(simulation.gain, 3);
+
+      const pill = $("statusPill");
+      pill.className = "status-pill";
+      const status = simulation.reason.toUpperCase();
+      if (["running", "settled", "timeout"].includes(simulation.reason)) pill.classList.add(simulation.reason);
+      $("statusText").textContent = status;
+    }
+
+    function updateConfig() {
+      $("configOutput").textContent = `.proportional = {\n    .initial = ${params.initial.toFixed(6)}f,\n    .final = ${params.final.toFixed(6)}f,\n    .scale = ${params.scale.toFixed(2)}f,\n    .power = ${params.power.toFixed(2)}f,\n},\n.kI = ${params.kI.toFixed(6)}f,\n.kD = ${params.kD.toFixed(6)}f,\n.integralRange = ${params.integralRange.toFixed(2)}f,\n.integralSignReset = ${params.signReset},`;
+    }
+
+    function renderAll() {
+      updateMetrics();
+      updatePose();
+      updateExitBadges();
+      updateConfig();
+      drawGainChart();
+      drawResponseChart();
+      drawVelocityChart();
+      drawOutputChart();
+    }
+
+    function animationLoop(now) {
+      const elapsed = Math.min(0.08, (now - previousFrame) / 1000);
+      previousFrame = now;
+      if (simulation.running) {
+        accumulator += elapsed;
+        while (accumulator >= DT && simulation.running) {
+          accumulator -= DT;
+          const continuing = stepState(simulation);
+          if (!continuing) simulation.running = false;
+        }
+        renderAll();
+      }
+      requestAnimationFrame(animationLoop);
+    }
+
+    async function copyConfig() {
+      const text = $("configOutput").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = text;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      const button = $("copyButton");
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = "Copy"; }, 1200);
+    }
+
+    $("runButton").addEventListener("click", runSimulation);
+    $("pauseButton").addEventListener("click", togglePause);
+    $("stepButton").addEventListener("click", manualStep);
+    $("resetButton").addEventListener("click", resetSimulation);
+    $("copyButton").addEventListener("click", copyConfig);
+    $("signReset").addEventListener("change", (event) => {
+      params.signReset = event.target.checked;
+      scheduleRecompute();
+    });
+    window.addEventListener("resize", () => requestAnimationFrame(renderAll));
+
+    renderControls();
+    renderAngleButtons();
+    resetSimulation();
+    requestAnimationFrame(animationLoop);
+  </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+
+// Compile-checked examples for every motion entry point and overload.
+// This function is documentation only; autonomous() below is the runnable example.
+[[maybe_unused]] void motionExamples() {
+    if (false) {
+        asset examplePath{nullptr, 0};
+
+        // Manual drive output is always on the signed -127..127 PROS scale.
+        chassis.tank(100, 100);
+        chassis.arcade(100, 30);
+        chassis.arcade(100, 30, 0.7f);
+        chassis.curvature(100, 30);
+
+        // Linear coordinates, distances, error exits, and half-plane tolerances are inches.
+        chassis.moveDistance(24, {.timeout = 1500, .velocityExit = 6, .errorExit = 0.6f,
+                                  .maxSpeed = 100});
+        chassis.push(80, {.timeout = 750, .velocityExit = 0.6f});
+        chassis.push(36, true, 80, {.timeout = 1500, .velocityExit = 0.6f,
+                                    .errorExit = 1.0f});
+        chassis.pushTo(36, false, 80, {.timeout = 1500, .velocityExit = 0.6f,
+                                      .errorExit = 1.0f});
+        chassis.crossBarrier({.timeout = 3000, .velocityExit = -1, .errorExit = 3,
+                              .speed = 100});
+
+        // Angular targets, error exits, and velocity exits are degrees and degrees/second.
+        chassis.turnToHeading(90, {.timeout = 1500, .velocityExit = 3, .errorExit = 4,
+                                   .maxSpeed = 100});
+        chassis.turnToPoint(24, 24, {.timeout = 1500, .velocityExit = 1, .errorExit = 1,
+                                     .forwards = true});
+        chassis.turnToPointStep(24, 24, {.timeout = 1500, .velocityExit = 1,
+                                         .errorExit = 1});
+        chassis.turnToHeading(90, {.timeout = 1500, .velocityExit = 3, .errorExit = 4,
+                                   .lockedSide = gen::LockedSide::LEFT});
+        chassis.turnToPoint(24, 24, {.timeout = 1500, .velocityExit = 1, .errorExit = 1,
+                                     .lockedSide = gen::LockedSide::RIGHT});
+
+        chassis.moveToPoint(24, 24, {.timeout = 2000, .velocityExit = 6,
+                                     .errorExit = 7.2f, .forwards = true, .maxSpeed = 100,
+                                     .halfPlaneExit = true, .halfPlaneTolerance = 2.4f});
+        chassis.moveToPose(24, 24, 90,
+                           {.timeout = 2000,
+                            .velocityExit = 6,
+                            .errorExit = -1,
+                            .forwards = true,
+                            .dLead = 12,
+                            .gLead = 0.2f,
+                            .maxSpeed = 100,
+                            .halfPlaneExit = true,
+                            .halfPlaneTolerance = 2.4f});
+
+        chassis.follow(examplePath, {.timeout = 4000, .velocityExit = 6,
+                                     .errorExit = -1});
+        chassis.followPursuit(examplePath, {.timeout = 4000, .velocityExit = 6,
+                                            .errorExit = -1, .minLookahead = 12,
+                                            .maxLookahead = 12});
+        chassis.followStanley(examplePath, {.timeout = 4000, .velocityExit = 6,
+                                            .errorExit = -1, .k = 1});
+        chassis.followAPS(examplePath, {.timeout = 4000, .velocityExit = 6,
+                                        .errorExit = -1, .maxSpeed = 100});
+
+        // Motion helpers and setPose overloads.
+        chassis.setPose(0, 0, 0);
+        chassis.setPose(gen::Pose(0, 0, 0));
+        chassis.waitUntil(12);
+        chassis.waitUntilDone();
+        chassis.cancelMotion();
+        chassis.cancelAllMotions();
+    }
+}

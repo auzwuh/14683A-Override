@@ -1,4 +1,5 @@
 #include "main.h"
+#include "autons.hpp"
 #include "GenSelector/selector.hpp"
 #include "gen/electronics.h"
 #include "gen/setup.hpp"
@@ -17,14 +18,21 @@ gen::Controller controller(gen::Controller::DriveMode::Arcade2Stick, 3, 10.0, fa
 gen::MotorGroup leftDrive({18, 17}, 600.0, 1.33);
 gen::MotorGroup rightDrive({20, 19}, 600.0, 1.33);
 gen::MotorGroup intake({12}, 600.0, 1.0);
-// pros::Rotation horizontalEncoder(-15);
-// pros::Rotation verticalEncoder(-16);
+// Scoring mechanisms used by the Override AWP routines in src/autons.cpp.
+// PORTS ARE UNVERIFIED - these come from the robot description, not from this
+// project's existing wiring.  Port 1 is the IMU here, so the intake stays on
+// 12 rather than moving to 1.  Check these before running on a real robot.
+gen::MotorGroup lift({2, 3}, 600.0, 1.0);     // cascade lift
+gen::MotorGroup claw({4}, 600.0, 1.0);        // claw grip
+gen::MotorGroup clawRot({5}, 600.0, 1.0);     // claw rotation for stacking
+pros::Rotation horizontalEncoder(-15);
+pros::Rotation verticalEncoder(-16);
 gen::CustomIMU imu(1, 1.01123595506);
 
 // Measure these signed offsets from the robot's tracking center.
 // Left/back offsets are negative; right/front offsets are positive.
-// gen::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);
-// gen::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, 2.75, -2.469176);
+gen::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);
+gen::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, 2.75, -2.469176);
 
 // gen::Piston wingPiston('A', false, "wing");
 // gen::PistonGroup wings({{"wing", &wingPiston}});
@@ -104,6 +112,8 @@ void doNothing() {}
 }
 
 robot::AutonRoutineList autonRoutines = {
+    {"Override AWP Red", static_cast<robot::AutonFunc>(Auton::overrideAwpRed)},
+    {"Override AWP Blue", static_cast<robot::AutonFunc>(Auton::overrideAwpBlue)},
     {"Current Test", static_cast<robot::AutonFunc>(Auton::currentTest)},
     {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
 };

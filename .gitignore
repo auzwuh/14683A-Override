@@ -6,3 +6,6 @@ compile_commands.json
 
 # Claude worktree/agent scratch
 .claude/
+
+# Python
+__pycache__/

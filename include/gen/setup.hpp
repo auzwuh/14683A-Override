@@ -4,33 +4,33 @@
 #include "pros/imu.hpp"
 #include "pros/motor_group.hpp"
 
-namespace gen::Motion {
+namespace arc::Motion {
 
 struct ControllerProfile {
     PIDConfig gains{};
     PIDConfig correctionGains{};
     ExitSettings exits{};
 
-    gen::ControllerSettings toGen() const;
+    arc::ControllerSettings toGen() const;
 };
 
 struct DrivetrainProfile {
     float trackWidthIn = 0.0f;
-    float wheelDiameterIn = gen::Omniwheel::NEW_325;
+    float wheelDiameterIn = arc::Omniwheel::NEW_325;
     float wheelRpm = 0.0f;
     float horizontalDrift = 2.0f;
 
-    gen::Drivetrain toGen(pros::MotorGroup* left, pros::MotorGroup* right) const;
+    arc::Drivetrain toGen(pros::MotorGroup* left, pros::MotorGroup* right) const;
 };
 
 struct OdomProfile {
-    gen::TrackingWheel* vertical1 = nullptr;
-    gen::TrackingWheel* vertical2 = nullptr;
-    gen::TrackingWheel* horizontal1 = nullptr;
-    gen::TrackingWheel* horizontal2 = nullptr;
+    arc::TrackingWheel* vertical1 = nullptr;
+    arc::TrackingWheel* vertical2 = nullptr;
+    arc::TrackingWheel* horizontal1 = nullptr;
+    arc::TrackingWheel* horizontal2 = nullptr;
     pros::Imu* imu = nullptr;
 
-    gen::OdomSensors toGen() const;
+    arc::OdomSensors toGen() const;
 };
 
-} // namespace gen::Motion
+} // namespace arc::Motion

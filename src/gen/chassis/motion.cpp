@@ -8,6 +8,7 @@
 
 #include "gen/chassis/chassis.hpp"
 #include "gen/chassis/odom.hpp"
+#include "gen/path_following/ramsete_lqr.hpp"
 #include "gen/util.hpp"
 #include "pros/rtos.hpp"
 
@@ -44,7 +45,7 @@ std::pair<float, float> scaleToRatio(float factor, float first, float second) {
     return {first * scale, second * scale};
 }
 
-void runOutput(const gen::Drivetrain& drivetrain, float left, float right, bool reverse = false) {
+void runOutput(const arc::Drivetrain& drivetrain, float left, float right, bool reverse = false) {
     if (reverse) {
         drivetrain.leftMotors->move(static_cast<int>(clamp(-right, -kMaxOutput, kMaxOutput)));
         drivetrain.rightMotors->move(static_cast<int>(clamp(-left, -kMaxOutput, kMaxOutput)));
@@ -54,24 +55,24 @@ void runOutput(const gen::Drivetrain& drivetrain, float left, float right, bool 
     }
 }
 
-void stop(const gen::Drivetrain& drivetrain) { runOutput(drivetrain, 0.0f, 0.0f); }
+void stop(const arc::Drivetrain& drivetrain) { runOutput(drivetrain, 0.0f, 0.0f); }
 
 float translationSpeed() {
-    const gen::Pose velocity = gen::getSpeed(false);
+    const arc::Pose velocity = arc::getSpeed(false);
     return std::hypot(velocity.x, velocity.y);
 }
 
-float angularSpeed() { return std::fabs(gen::getSpeed(false).theta); }
+float angularSpeed() { return std::fabs(arc::getSpeed(false).theta); }
 
 // A negative exit threshold disables that exit. Disabled exits must not make a
 // motion settle immediately; they remain pending until another enabled exit or
 // the timeout ends the motion.
 bool errorPending(float error, float threshold) {
-    return threshold < 0.0f || gen::ExitCondition::error(error, threshold);
+    return threshold < 0.0f || arc::ExitCondition::error(error, threshold);
 }
 
 bool velocityPending(float velocity, float threshold) {
-    return threshold < 0.0f || gen::ExitCondition::velocity(velocity, threshold);
+    return threshold < 0.0f || arc::ExitCondition::velocity(velocity, threshold);
 }
 
 bool anyEnabledExitPending(bool velocityEnabled, float velocity, float velocityThreshold,
@@ -86,38 +87,38 @@ bool anyEnabledExitPending(bool velocityEnabled, float velocity, float velocityT
 
 float reducedAngle(float degrees) { return std::remainder(degrees, 360.0f); }
 
-gen::Pose motionPose(bool forwards) {
-    gen::Pose pose = gen::getPose(false);
+arc::Pose motionPose(bool forwards) {
+    arc::Pose pose = arc::getPose(false);
     if (!forwards) pose.theta = reducedAngle(pose.theta + 180.0f);
     return pose;
 }
 
-float bearing(const gen::Pose& from, const gen::Pose& to) {
-    return reducedAngle(gen::radToDeg(std::atan2(to.x - from.x, to.y - from.y)));
+float bearing(const arc::Pose& from, const arc::Pose& to) {
+    return reducedAngle(arc::radToDeg(std::atan2(to.x - from.x, to.y - from.y)));
 }
 
-float faceError(const gen::Pose& pose, const gen::Pose& target,
-                gen::AngularDirection direction = gen::AngularDirection::AUTO) {
-    return gen::angleError(bearing(pose, target), pose.theta, false, direction);
+float faceError(const arc::Pose& pose, const arc::Pose& target,
+                arc::AngularDirection direction = arc::AngularDirection::AUTO) {
+    return arc::angleError(bearing(pose, target), pose.theta, false, direction);
 }
 
-float parallelError(const gen::Pose& pose, float targetHeading,
-                    gen::AngularDirection direction = gen::AngularDirection::AUTO) {
-    return gen::angleError(targetHeading, pose.theta, false, direction);
+float parallelError(const arc::Pose& pose, float targetHeading,
+                    arc::AngularDirection direction = arc::AngularDirection::AUTO) {
+    return arc::angleError(targetHeading, pose.theta, false, direction);
 }
 
-float radiusBetween(const gen::Pose& first, const gen::Pose& second, float heading) {
+float radiusBetween(const arc::Pose& first, const arc::Pose& second, float heading) {
     const float distance = first.distance(second);
-    const float error = gen::degToRad(gen::angleError(bearing(first, second), heading, false));
+    const float error = arc::degToRad(arc::angleError(bearing(first, second), heading, false));
     const float denominator = std::sqrt(std::max(0.0f, 2.0f - 2.0f * std::cos(2.0f * error)));
     if (denominator < 1e-6f) return std::numeric_limits<float>::infinity();
     return distance / denominator;
 }
 
-float pathCurvature(const gen::Pose& first, const gen::Pose& second, float heading) {
+float pathCurvature(const arc::Pose& first, const arc::Pose& second, float heading) {
     const float radius = radiusBetween(first, second, heading);
     if (!std::isfinite(radius) || radius == 0.0f) return 0.0f;
-    const float headingRad = gen::degToRad(heading);
+    const float headingRad = arc::degToRad(heading);
     const float sideValue = std::cos(headingRad) * (second.x - first.x) -
                             std::sin(headingRad) * (second.y - first.y);
     return std::copysign(1.0f / radius, sideValue);
@@ -128,13 +129,19 @@ float pathOutput(float storedSpeed) {
 }
 
 struct PathData {
-    std::vector<gen::Pose> points;
+    std::vector<arc::Pose> points;
+    // Optional 4th column (Atticus export, math-standard CCW-positive
+    // convention, 1/inch - see mod/pathing.py:calculate_path_curvature in
+    // the Atticus repo). Empty for older 3-column (x, y, speed) paths.
+    std::vector<float> curvature;
 
     bool valid() const { return points.size() >= 2; }
+    bool hasCurvature() const { return curvature.size() == points.size(); }
     int lastIndex() const { return static_cast<int>(points.size()) - 1; }
-    const gen::Pose& at(int index) const { return points.at(std::clamp(index, 0, lastIndex())); }
+    const arc::Pose& at(int index) const { return points.at(std::clamp(index, 0, lastIndex())); }
+    float curvatureAt(int index) const { return curvature.at(std::clamp(index, 0, lastIndex())); }
 
-    int closestIndex(const gen::Pose& pose) const {
+    int closestIndex(const arc::Pose& pose) const {
         int result = 0;
         float closest = std::numeric_limits<float>::infinity();
         for (int index = 0; index <= lastIndex(); ++index) {
@@ -147,7 +154,7 @@ struct PathData {
         return result;
     }
 
-    gen::Pose lookaheadPoint(const gen::Pose& pose, int startIndex, float lookahead) const {
+    arc::Pose lookaheadPoint(const arc::Pose& pose, int startIndex, float lookahead) const {
         for (int index = std::max(0, startIndex); index <= lastIndex(); ++index) {
             if (pose.distance(points[index]) >= lookahead) return points[index];
         }
@@ -162,6 +169,7 @@ PathData readPath(const asset& path) {
     const std::string data(reinterpret_cast<const char*>(path.buf), path.size);
     std::istringstream lines(data);
     std::string line;
+    bool sawCurvatureColumn = false;
     while (std::getline(lines, line)) {
         if (line == "endData" || line == "endData\r") break;
         std::replace(line.begin(), line.end(), ',', ' ');
@@ -169,30 +177,38 @@ PathData readPath(const asset& path) {
         float x = 0.0f;
         float y = 0.0f;
         float speed = 0.0f;
-        if (values >> x >> y >> speed) result.points.emplace_back(x, y, speed);
+        float curvature = 0.0f;
+        if (values >> x >> y >> speed) {
+            result.points.emplace_back(x, y, speed);
+            // A 4th column is optional - present on paths exported by the
+            // Atticus curvature update, absent on older 3-column paths.
+            if (values >> curvature) sawCurvatureColumn = true;
+            result.curvature.push_back(curvature);
+        }
     }
+    if (!sawCurvatureColumn) result.curvature.clear();
     return result;
 }
 
 bool continuePath(const PathData& path, int pathIndex, float velocityExit, float errorExit,
-                  const gen::Pose& pose) {
+                  const arc::Pose& pose) {
     const bool notAtEnd = pathIndex != path.lastIndex();
     const bool stoppedEnd = pathOutput(path.points.back().theta) == 0.0f &&
-                            gen::ExitCondition::velocity(translationSpeed(), velocityExit);
-    const bool outsideError = gen::ExitCondition::error(pose.distance(path.points.back()), errorExit);
+                            arc::ExitCondition::velocity(translationSpeed(), velocityExit);
+    const bool outsideError = arc::ExitCondition::error(pose.distance(path.points.back()), errorExit);
     return notAtEnd || stoppedEnd || outsideError;
 }
 
 template <typename Params>
-void applyExitDefaults(Params& params, const gen::ExitSettings& defaults) {
-    if (params.timeout == gen::useProfileTimeout) params.timeout = defaults.timeout;
-    if (params.velocityExit == gen::useProfileExit) params.velocityExit = defaults.velocityExit;
-    if (params.errorExit == gen::useProfileExit) params.errorExit = defaults.errorExit;
+void applyExitDefaults(Params& params, const arc::ExitSettings& defaults) {
+    if (params.timeout == arc::useProfileTimeout) params.timeout = defaults.timeout;
+    if (params.velocityExit == arc::useProfileExit) params.velocityExit = defaults.velocityExit;
+    if (params.errorExit == arc::useProfileExit) params.errorExit = defaults.errorExit;
 }
 
 template <typename Params>
-void applySettleDefaults(Params& params, const gen::ExitSettings& defaults) {
-    if (params.settleTimeMs == gen::useProfileSettleTime) {
+void applySettleDefaults(Params& params, const arc::ExitSettings& defaults) {
+    if (params.settleTimeMs == arc::useProfileSettleTime) {
         params.settleTimeMs = defaults.settleTimeMs;
     }
 }
@@ -217,25 +233,25 @@ class SettleTimer {
     std::uint32_t settledSince_ = 0;
 };
 
-int turnSides(gen::LockedSide lockedSide) {
-    if (lockedSide == gen::LockedSide::LEFT) return 1;
-    if (lockedSide == gen::LockedSide::RIGHT) return 0;
+int turnSides(arc::LockedSide lockedSide) {
+    if (lockedSide == arc::LockedSide::LEFT) return 1;
+    if (lockedSide == arc::LockedSide::RIGHT) return 0;
     return 2;
 }
 
 template <typename Params>
-void applyHalfPlaneDefaults(Params& params, const gen::ExitSettings& defaults) {
-    if (params.halfPlaneExit == gen::useProfileHalfPlane) {
+void applyHalfPlaneDefaults(Params& params, const arc::ExitSettings& defaults) {
+    if (params.halfPlaneExit == arc::useProfileHalfPlane) {
         params.halfPlaneExit = defaults.halfPlaneExit ? 1 : 0;
     }
-    if (params.halfPlaneTolerance == gen::useProfileExit) {
+    if (params.halfPlaneTolerance == arc::useProfileExit) {
         params.halfPlaneTolerance = defaults.halfPlaneTolerance;
     }
 }
 
 } // namespace
 
-namespace gen {
+namespace arc {
 
 void Chassis::tank(int left, int right) {
     drivetrain.leftMotors->move(std::clamp(left, -127, 127));
@@ -1001,4 +1017,143 @@ void Chassis::followAPS(const asset& pathAsset, APSParams params) {
     endMotion();
 }
 
-} // namespace gen
+// Real implementation - declared as a friend of Chassis (chassis.hpp) so it
+// can reach the same protected motion-queueing state (motionRunning,
+// requestMotionStart()/endMotion(), distTraveled, headingTarget) and
+// drivetrain/lateralSettings every other motion in this file uses.
+// Chassis::followRamseteLQR() below just forwards here.
+void followRamseteLQR(Chassis& chassis, const asset& pathAsset, RamseteLQRParams params) {
+    applyExitDefaults(params, chassis.lateralSettings.exits);
+    if (params.async) {
+        params.async = false;
+        const asset path = pathAsset;
+        pros::Task task([&chassis, path, params] { followRamseteLQR(chassis, path, params); });
+        return;
+    }
+
+    const PathData path = readPath(pathAsset);
+    if (!path.valid()) return;
+    chassis.requestMotionStart();
+    if (!chassis.motionRunning) {
+        chassis.endMotion();
+        return;
+    }
+
+    // The exported path's speed column is a -127..127 duty value, same as
+    // every other follow*() here. arc::path controllers work in real
+    // inches/second and radians/second, so this is the conversion factor
+    // between the two: the chassis's theoretical top wheel speed.
+    const float maxLinearInPerSec = chassis.drivetrain.wheelDiameter * static_cast<float>(M_PI) *
+                                    chassis.drivetrain.rpm / 60.0f;
+
+    arc::path::Limits limits;
+    limits.maxLinear = maxLinearInPerSec;
+    limits.maxAngular = maxLinearInPerSec / std::max(1e-3f, chassis.drivetrain.trackWidth * 0.5f);
+    // Generous - clampControl's job here is just to keep the math finite;
+    // real acceleration limiting already happens in the drivetrain itself.
+    limits.maxLinearAcceleration = limits.maxLinear * 6.0f;
+    limits.maxAngularAcceleration = limits.maxAngular * 6.0f;
+
+    arc::path::RamseteLQRConfig config;
+    config.b = params.b;
+    config.zeta = params.zeta;
+    config.limits = limits;
+    arc::path::RamseteLQRController controller(config);
+
+    const std::uint32_t startTime = pros::millis();
+    std::uint32_t previousTime = startTime;
+    int pathIndex = 0;
+    int furthestIndex = 0;
+    Pose pose = motionPose(params.forwards);
+    Pose previous = pose;
+    chassis.distTraveled = 0.0f;
+
+    do {
+        pose = motionPose(params.forwards);
+        pathIndex = path.closestIndex(pose);
+        furthestIndex = std::max(furthestIndex, pathIndex);
+        pathIndex = furthestIndex;
+
+        const Pose current = path.at(pathIndex);
+        const Pose next = path.at(pathIndex + 1);
+        const Pose prior = path.at(pathIndex - 1);
+        const float pathHeadingDeg = pathIndex == path.lastIndex() ? bearing(prior, current) : bearing(current, next);
+        const float refSpeedDuty = current.theta; // stored -127..127 target speed at this waypoint
+        const float refLinearInPerSec = refSpeedDuty / kMaxOutput * maxLinearInPerSec;
+        // Prefer the path's own exported curvature column when present
+        // (Atticus, math-standard CCW-positive - the same convention
+        // arc::path already uses, so it plugs in directly with no sign
+        // flip). Fall back to a two-point estimate for older 3-column
+        // paths: pathCurvature is signed in this file's compass convention
+        // (positive = clockwise/right, same as bearing()), the opposite of
+        // arc::path's, so that estimate is negated to match.
+        const float refAngularRadPerSec = path.hasCurvature()
+            ? refLinearInPerSec * path.curvatureAt(pathIndex)
+            : -refLinearInPerSec * pathCurvature(current, next, pathHeadingDeg);
+
+        // --- Coordinate conversion -------------------------------------
+        // arc::Chassis poses are compass-style: x = east, y = north/forward,
+        // theta = degrees clockwise from +y (north). arc::path assumes the
+        // standard unicycle frame: x = forward, y = left, theta = radians
+        // counter-clockwise from +x. x/y stay the same field inches in both
+        // frames; only theta and angular velocity need converting:
+        //   theta_path = 90deg - theta_compass      (both in the same axes)
+        //   omega_path = -omega_compass
+        // Verified against both endpoints: compass 0 deg (facing +y) maps to
+        // theta_path = 90 deg, i.e. motion along +y - matches; compass 90 deg
+        // (facing +x) maps to theta_path = 0 deg, motion along +x - matches.
+        const float poseThetaRad = degToRad(90.0f - pose.theta);
+        const float refThetaRad = degToRad(90.0f - pathHeadingDeg);
+        const Pose angularSpeedPose = getSpeed(false); // degrees/sec, compass convention
+        const float poseOmegaRadPerSec = -degToRad(angularSpeedPose.theta);
+
+        arc::path::State state;
+        state.pose = {pose.x, pose.y, poseThetaRad};
+        // translationSpeed() is an unsigned magnitude; !forwards already
+        // flips pose.theta by 180 deg via motionPose() the same way every
+        // other motion here handles reverse driving, so this stays positive.
+        state.linearVelocity = translationSpeed();
+        state.angularVelocity = poseOmegaRadPerSec;
+
+        arc::path::Reference reference;
+        reference.pose = {current.x, current.y, refThetaRad};
+        reference.velocity = {refLinearInPerSec, refAngularRadPerSec};
+        const arc::path::Horizon horizon(1, reference);
+
+        const std::uint32_t now = pros::millis();
+        const double dt = std::max(0.001, (now - previousTime) / 1000.0);
+        previousTime = now;
+
+        const arc::path::Control command = controller.calculate(state, horizon, dt);
+
+        // No sign flip needed here: command.linear/angular are already in
+        // arc::path's standard frame, which is exactly what this differential
+        // -drive wheel-speed formula expects (positive angular = CCW = turn
+        // left = right wheel faster).
+        const float halfTrack = chassis.drivetrain.trackWidth * 0.5f;
+        const float wheelOmegaInPerSec = static_cast<float>(command.angular) * halfTrack;
+        const float leftInPerSec = static_cast<float>(command.linear) - wheelOmegaInPerSec;
+        const float rightInPerSec = static_cast<float>(command.linear) + wheelOmegaInPerSec;
+
+        const float leftOutput = leftInPerSec / maxLinearInPerSec * kMaxOutput;
+        const float rightOutput = rightInPerSec / maxLinearInPerSec * kMaxOutput;
+        const auto output = reduceRatio(speedOutput(params.maxSpeed), leftOutput, rightOutput);
+        runOutput(chassis.drivetrain, output.first, output.second, !params.forwards);
+
+        chassis.distTraveled += pose.distance(previous);
+        previous = pose;
+        pros::delay(10);
+    } while (chassis.motionRunning && ExitCondition::time(startTime, params.timeout) &&
+             continuePath(path, pathIndex, params.velocityExit, params.errorExit, pose));
+
+    chassis.headingTarget = getPose().theta;
+    stop(chassis.drivetrain);
+    chassis.distTraveled = -1.0f;
+    chassis.endMotion();
+}
+
+void Chassis::followRamseteLQR(const asset& path, RamseteLQRParams params) {
+    arc::followRamseteLQR(*this, path, params);
+}
+
+} // namespace arc

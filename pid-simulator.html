@@ -542,6 +542,7 @@
       .split-charts { grid-template-columns: 1fr; }
       .canvas-wrap { height: 260px; }
     }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -557,11 +558,28 @@
 
       <div class="formula">
         <div class="formula-main">k<sub>P</sub>(s) = (f − i) · |s|<sup>p</sup> / (|s|<sup>p</sup> + k<sup>p</sup>) + i</div>
-        <p class="formula-note">The proportional gain is selected from the command angle once, then held for the complete turn.</p>
+        <p class="formula-note" id="formulaNote"></p>
       </div>
 
       <section class="section">
-        <div class="section-title"><span>Command angle</span><span id="selectedAngleText">90°</span></div>
+        <div class="section-title"><span>Profile</span><span id="domainModeLabel">Turn (degrees)</span></div>
+        <div class="switch-row">
+          <span>Drive - inches, no wraparound (vs. Turn - degrees)</span>
+          <label class="switch"><input id="domainMode" type="checkbox"><span></span></label>
+        </div>
+        <p class="model-note" style="margin-top:8px;">Switches every field below to this robot's actual lateralProfile or angularProfile defaults (src/main.cpp) - they are not interchangeable presets, they're different profiles.</p>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><span>Gain schedule</span><span id="scheduleModeLabel">Filtered current error</span></div>
+        <div class="switch-row">
+          <span>Filtered current error (vs. motion setpoint)</span>
+          <label class="switch"><input id="scheduleMode" type="checkbox" checked><span></span></label>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><span id="commandSectionTitle">Command angle</span><span id="selectedAngleText">90°</span></div>
         <div class="angle-grid" id="angleGrid"></div>
       </section>
 
@@ -602,15 +620,15 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Interactive response workspace</p>
-          <h2>Turn response across command angles</h2>
-          <p>Compare 10° through 180°, inspect the selected gain, then export the profile.</p>
+          <h2 id="pageTitle">Turn response across command angles</h2>
+          <p id="pageSubtitle">Compare 10° through 180°, inspect the selected gain, then export the profile.</p>
         </div>
         <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusText">READY</span></div>
       </header>
 
       <section class="metrics">
         <div class="metric"><div class="metric-label">Target</div><div class="metric-value gold" id="metricTarget">90.0°</div></div>
-        <div class="metric"><div class="metric-label">Heading</div><div class="metric-value" id="metricHeading">0.0°</div></div>
+        <div class="metric"><div class="metric-label" id="metricHeadingLabel">Heading</div><div class="metric-value" id="metricHeading">0.0°</div></div>
         <div class="metric"><div class="metric-label">Error</div><div class="metric-value" id="metricError">90.0°</div></div>
         <div class="metric"><div class="metric-label">Output</div><div class="metric-value cyan" id="metricOutput">0.0</div></div>
         <div class="metric"><div class="metric-label">Selected kP</div><div class="metric-value cyan" id="metricGain">0.00</div></div>
@@ -619,18 +637,18 @@
       <section class="dashboard">
         <article class="card gain-card">
           <div class="card-head">
-            <div><h3 class="card-title">Asymptotic proportional curve</h3><p class="card-subtitle">Markers show the tested command angles; gold is the active command.</p></div>
-            <span class="card-tag">gain / degrees</span>
+            <div><h3 class="card-title">Asymptotic proportional curve</h3><p class="card-subtitle">Markers show the tested commands; gold is the active command.</p></div>
+            <span class="card-tag" id="gainCardTag">gain / degrees</span>
           </div>
           <div class="canvas-wrap"><canvas id="gainCanvas"></canvas></div>
         </article>
 
         <article class="card pose-card">
           <div class="card-head">
-            <div><h3 class="card-title">Robot heading</h3><p class="card-subtitle">Cyan is current heading; gold is the target.</p></div>
+            <div><h3 class="card-title" id="poseCardTitle">Robot heading</h3><p class="card-subtitle" id="poseCardSubtitle">Cyan is current heading; gold is the target.</p></div>
             <span class="card-tag" id="simTimeTag">0.00 s</span>
           </div>
-          <div class="pose-stage">
+          <div class="pose-stage" id="poseSection">
             <svg viewBox="-150 -150 300 300" role="img" aria-label="Top-down robot heading simulation">
               <circle class="dial-grid" r="118"></circle>
               <circle class="dial-grid" r="82"></circle>
@@ -660,7 +678,7 @@
 
         <article class="card wide">
           <div class="card-head">
-            <div><h3 class="card-title">Normalized angle response</h3><p class="card-subtitle">Every preset is simulated with the same profile; 100% is its own commanded angle.</p></div>
+            <div><h3 class="card-title" id="responseCardTitle">Normalized angle response</h3><p class="card-subtitle" id="responseCardSubtitle">Every preset is simulated with the same profile; 100% is its own commanded angle.</p></div>
             <span class="card-tag">% target / time</span>
           </div>
           <div class="canvas-wrap"><canvas id="responseCanvas"></canvas></div>
@@ -669,8 +687,8 @@
         <div class="split-charts">
           <article class="card">
             <div class="card-head">
-              <div><h3 class="card-title">Angular velocity</h3><p class="card-subtitle">Selected command response in degrees per second.</p></div>
-              <span class="card-tag">deg/s</span>
+              <div><h3 class="card-title" id="velocityCardTitle">Angular velocity</h3><p class="card-subtitle" id="velocityCardSubtitle">Selected command response in degrees per second.</p></div>
+              <span class="card-tag" id="velocityCardTag">deg/s</span>
             </div>
             <div class="canvas-wrap short"><canvas id="velocityCanvas"></canvas></div>
           </article>
@@ -691,50 +709,99 @@
 
     const DT = 0.01;
     const ANGLES = [10, 20, 30, 45, 60, 90, 135, 180];
+    const DISTANCES = [6, 12, 24, 36, 48, 72, 96, 144];
     const COLORS = ["#3b8298", "#3f94ad", "#42a6c2", "#46b8d6", "#4dc9e9", "#57d9ff", "#8bbfd1", "#b7c9cf"];
 
-    const params = {
-      target: 90,
-      initial: 5.08,
-      final: 2.328333,
-      scale: 28,
-      power: 1.7,
-      kI: 21.166667,
-      kD: 0.127,
-      integralRange: 5,
-      signReset: true,
-      maxOutput: 127,
-      timeout: 2000,
-      errorExit: 4,
-      velocityExit: 3,
-      motorAccel: 900,
-      damping: 4.5,
-      friction: 5
+    // Turn (degrees, angle-wrapped) vs Drive (inches, no wraparound) are
+    // physically different problems - a straight-line move can legitimately
+    // command more than 180in, which angle-wrapping would silently corrupt.
+    // Each domain seeds from this robot's actual current profile in
+    // src/main.cpp (angularProfile / lateralProfile), not generic defaults.
+    const DOMAIN_PROFILES = {
+      angle: {
+        target: 90, initial: 4.75, final: 2.33, scale: 28, power: 1.5,
+        scheduleMode: "filteredCurrentError", scheduleAlpha: 0.15, derivativeAlpha: 0.15,
+        kI: 0.0, kD: 0.157, integralRange: 5, signReset: true,
+        timeout: 2000, errorExit: 4, velocityExit: 3,
+        motorAccel: 900, damping: 4.5, friction: 5
+      },
+      linear: {
+        target: 24, initial: 5.73, final: 5.73, scale: 12, power: 1.0,
+        // lateralProfile never sets scheduleMode/scheduleAlpha/derivativeAlpha
+        // in main.cpp, so these are PIDConfig's own struct defaults, not
+        // measurements - same status as motorAccel/damping/friction below.
+        scheduleMode: "motionSetpoint", scheduleAlpha: 1.0, derivativeAlpha: 1.0,
+        kI: 0.88, kD: 0.01, integralRange: 6, signReset: true,
+        timeout: 2000, errorExit: 0.6, velocityExit: 6,
+        // motorAccel/damping derived (not guessed) from this drivetrain's
+        // own theoretical top speed - same formula followRamseteLQR uses
+        // in motion.cpp: wheelDiameter(2.75) * pi * rpm(450) / 60 ~= 64.8
+        // in/s steady-state = motorAccel/damping. Still unmeasured against
+        // real friction/traction - treat as a starting point, not truth.
+        motorAccel: 300, damping: 4.6, friction: 4
+      }
     };
+
+    const params = {
+      domain: "angle",
+      maxOutput: 127,
+      ...DOMAIN_PROFILES.angle
+    };
+
+    function presets() { return params.domain === "angle" ? ANGLES : DISTANCES; }
+    function unit(kind) {
+      // kind: "pos" | "vel" | "accel"
+      const linear = params.domain === "linear";
+      if (kind === "pos") return linear ? "in" : "deg";
+      if (kind === "vel") return linear ? "in/s" : "deg/s";
+      return linear ? "in/s²" : "deg/s²";
+    }
+    function posSuffix() { return params.domain === "linear" ? "in" : "°"; }
 
     const controlGroups = {
       gainControls: [
-        ["target", "Custom command", "deg", 1, 180, 1],
+        ["target", "Custom command", () => unit("pos"), 1, 200, 1],
         ["initial", "Initial gain", "", 0, 12, 0.01],
         ["final", "Final gain", "", 0, 12, 0.01],
-        ["scale", "Scale / midpoint", "deg", 1, 180, 1],
-        ["power", "Transition power", "", 0.2, 4, 0.05]
+        ["scale", "Scale / midpoint", () => unit("pos"), 1, 100, 1],
+        ["power", "Transition power", "", 0.2, 4, 0.05],
+        ["scheduleAlpha", "Error filter alpha", "", 0.01, 1, 0.01]
       ],
       pidControls: [
         ["kI", "Integral gain", "", 0, 50, 0.01],
         ["kD", "Derivative gain", "", 0, 2, 0.001],
-        ["integralRange", "Integral range", "deg", 0, 30, 0.1],
+        ["derivativeAlpha", "Derivative filter alpha", "", 0.01, 1, 0.01],
+        ["integralRange", "Integral range", () => unit("pos"), 0, 30, 0.1],
         ["maxOutput", "Maximum output", "±", 1, 127, 1],
         ["timeout", "Timeout", "ms", 100, 6000, 100],
-        ["errorExit", "Error exit", "deg", 0, 20, 0.1],
-        ["velocityExit", "Velocity exit", "deg/s", 0, 30, 0.5]
+        ["errorExit", "Error exit", () => unit("pos"), 0, 20, 0.1],
+        ["velocityExit", "Velocity exit", () => unit("vel"), 0, 30, 0.5]
       ],
       modelControls: [
-        ["motorAccel", "Motor acceleration", "deg/s²", 100, 1800, 10],
+        ["motorAccel", "Motor acceleration", () => unit("accel"), 100, 1800, 10],
         ["damping", "Drivetrain damping", "/s", 0.2, 12, 0.1],
         ["friction", "Static friction", "output", 0, 30, 0.5]
       ]
     };
+
+    // scheduleMode: "motionSetpoint" picks kP once from the total commanded
+    // move and holds it for the whole turn (library: GainScheduleMode::
+    // MotionSetpoint). "filteredCurrentError" recomputes kP every tick from
+    // a low-pass-filtered |current error| (library: FilteredCurrentError) -
+    // this is what this robot's angularProfile actually uses. They are NOT
+    // interchangeable for tuning purposes: under filteredCurrentError, the
+    // gain a given move starts at is always ~gainAt(|full error|) ("final"-
+    // side of the curve) and relaxes toward gainAt(0) ("initial"-side) as
+    // the move finishes - the opposite of how "initial"/"final" read under
+    // motionSetpoint, where small commanded moves stay near "initial" and
+    // large ones stay near "final" for their entire duration.
+    function scheduleNote() {
+      const move = params.domain === "linear" ? "drive" : "turn";
+      const command = params.domain === "linear" ? "commanded distance" : "commanded angle";
+      return params.scheduleMode === "filteredCurrentError"
+        ? `Filtered current error: kP recomputes every tick from a smoothed |error|. It starts near the "final" side of the curve (large error) and relaxes toward "initial" (near zero) as the ${move} finishes - within a single move, not just between differently sized ones.`
+        : `Motion setpoint: kP is selected once from the full ${command} and held for the entire ${move} - small commanded moves stay near "initial", large ones stay near "final", for their whole duration.`;
+    }
 
     const $ = (id) => document.getElementById(id);
     const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -742,6 +809,10 @@
     const format = (value, digits = 1) => Number.isFinite(value) ? value.toFixed(digits) : "—";
 
     function angleError(target, current) {
+      // Angle-wrapping is only physically correct for headings. A straight-
+      // line distance in inches has no wraparound - a 200in commanded move
+      // must not fold into -160in the way a 200deg heading folds into -160deg.
+      if (params.domain === "linear") return target - current;
       let error = target - current;
       while (error > 180) error -= 360;
       while (error < -180) error += 360;
@@ -759,14 +830,17 @@
     function renderControls() {
       Object.entries(controlGroups).forEach(([containerId, controls]) => {
         const container = $(containerId);
-        container.innerHTML = controls.map(([key, name, unit, min, max, step]) => `
+        container.innerHTML = controls.map(([key, name, unitSpec, min, max, step]) => {
+          const unitText = typeof unitSpec === "function" ? unitSpec() : unitSpec;
+          return `
           <label class="control">
-            <span class="control-head"><span class="control-name">${name}<span class="control-unit">${unit}</span></span></span>
+            <span class="control-head"><span class="control-name">${name}<span class="control-unit">${unitText}</span></span></span>
             <span class="control-row">
               <input type="range" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${params[key]}">
               <input type="number" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${params[key]}">
             </span>
-          </label>`).join("");
+          </label>`;
+        }).join("");
       });
 
       document.querySelectorAll("[data-param]").forEach((input) => {
@@ -785,8 +859,8 @@
 
     function renderAngleButtons() {
       document.querySelectorAll('[data-param="target"]').forEach((input) => { input.value = params.target; });
-      $("angleGrid").innerHTML = ANGLES.map((angle) =>
-        `<button class="angle-chip${angle === params.target ? " active" : ""}" data-angle="${angle}">${angle}°</button>`
+      $("angleGrid").innerHTML = presets().map((value) =>
+        `<button class="angle-chip${value === params.target ? " active" : ""}" data-angle="${value}">${value}${posSuffix()}</button>`
       ).join("");
       document.querySelectorAll("[data-angle]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -799,6 +873,10 @@
 
     function makeState(target) {
       const error = angleError(target, 0);
+      // Matches PID::reset(): the schedule filter and (for
+      // filteredCurrentError) the starting gain both seed from the actual
+      // starting error, same as PID::reset()/PID::PID() do in the library.
+      const filteredScheduleMagnitude = Math.abs(error);
       return {
         target,
         t: 0,
@@ -806,13 +884,15 @@
         omega: 0,
         integral: 0,
         previousError: error,
-        gain: gainAt(error),
+        filteredScheduleMagnitude,
+        filteredDerivative: 0,
+        gain: gainAt(filteredScheduleMagnitude),
         output: 0,
         rawOutput: 0,
         error,
         reason: "ready",
         running: false,
-        data: [{ t: 0, angle: 0, error, omega: 0, output: 0, rawOutput: 0 }]
+        data: [{ t: 0, angle: 0, error, omega: 0, output: 0, rawOutput: 0, gain: gainAt(filteredScheduleMagnitude) }]
       };
     }
 
@@ -820,6 +900,17 @@
       if (state.reason === "settled" || state.reason === "timeout") return false;
 
       const error = angleError(state.target, state.angle);
+
+      // Matches PID::update(): under filteredCurrentError this is the ONE
+      // difference from motionSetpoint - kP is recomputed every tick from a
+      // low-pass-filtered |error| instead of staying fixed for the whole
+      // move.
+      if (params.scheduleMode === "filteredCurrentError") {
+        const alpha = clamp(params.scheduleAlpha, 0, 1);
+        state.filteredScheduleMagnitude += alpha * (Math.abs(error) - state.filteredScheduleMagnitude);
+        state.gain = gainAt(state.filteredScheduleMagnitude);
+      }
+
       if (Math.abs(error) > params.integralRange) {
         state.integral = 0;
       } else if (params.signReset && signbit(error) !== signbit(state.previousError)) {
@@ -828,9 +919,11 @@
         state.integral += error * DT;
       }
 
-      const derivative = (error - state.previousError) * 100;
+      const rawDerivative = (error - state.previousError) * 100;
+      const derivativeAlpha = clamp(params.derivativeAlpha, 0, 1);
+      state.filteredDerivative += derivativeAlpha * (rawDerivative - state.filteredDerivative);
       state.previousError = error;
-      state.rawOutput = state.gain * error + params.kI * state.integral + params.kD * derivative;
+      state.rawOutput = state.gain * error + params.kI * state.integral + params.kD * state.filteredDerivative;
       state.output = clamp(state.rawOutput, -params.maxOutput, params.maxOutput);
 
       const magnitude = Math.abs(state.output);
@@ -850,7 +943,8 @@
           error: state.error,
           omega: state.omega,
           output: state.output,
-          rawOutput: state.rawOutput
+          rawOutput: state.rawOutput,
+          gain: state.gain
         });
       }
 
@@ -889,7 +983,7 @@
 
     function resetSimulation() {
       simulation = makeState(params.target);
-      predictions = ANGLES.map(simulate);
+      predictions = presets().map(simulate);
       accumulator = 0;
       renderAngleButtons();
       renderAll();
@@ -1000,7 +1094,7 @@
     }
 
     function drawGainChart() {
-      const maxAngle = Math.max(180, params.target);
+      const maxAngle = Math.max(params.domain === "angle" ? 180 : 144, params.target);
       const points = [];
       for (let angle = 0; angle <= maxAngle; angle += Math.max(0.5, maxAngle / 240)) {
         points.push({ x: angle, y: gainAt(angle) });
@@ -1010,12 +1104,12 @@
       const margin = Math.max(0.3, (high - low) * 0.24);
       const result = chart($("gainCanvas"), {
         xMin: 0, xMax: maxAngle, yMin: Math.max(0, low - margin), yMax: high + margin,
-        xFormat: (value) => `${Math.round(value)}°`,
+        xFormat: (value) => `${Math.round(value)}${posSuffix()}`,
         yFormat: (value) => format(value, 2),
         series: [{ data: points, color: "#57d9ff", width: 2.5 }]
       });
       const { ctx, xMap, yMap } = result;
-      ANGLES.filter((angle) => angle <= maxAngle).forEach((angle) => {
+      presets().filter((angle) => angle <= maxAngle).forEach((angle) => {
         ctx.beginPath();
         ctx.arc(xMap(angle), yMap(gainAt(angle)), angle === params.target ? 5 : 3, 0, Math.PI * 2);
         ctx.fillStyle = angle === params.target ? "#ffd36a" : "#7b939d";
@@ -1129,13 +1223,44 @@
     }
 
     function updateMetrics() {
-      $("selectedAngleText").textContent = `${params.target}°`;
-      $("gainPreview").textContent = `kP ${format(gainAt(params.target), 3)}`;
-      $("metricTarget").textContent = `${format(params.target, 1)}°`;
-      $("metricHeading").textContent = `${format(simulation.angle, 1)}°`;
-      $("metricError").textContent = `${format(simulation.error, 1)}°`;
+      const suffix = posSuffix();
+      const linear = params.domain === "linear";
+      $("selectedAngleText").textContent = `${params.target}${suffix}`;
+      $("gainPreview").textContent = `kP start ${format(gainAt(params.target), 3)}`;
+      $("metricTarget").textContent = `${format(params.target, 1)}${suffix}`;
+      $("metricHeading").textContent = `${format(simulation.angle, 1)}${suffix}`;
+      $("metricError").textContent = `${format(simulation.error, 1)}${suffix}`;
       $("metricOutput").textContent = format(simulation.output, 1);
       $("metricGain").textContent = format(simulation.gain, 3);
+      $("formulaNote").textContent = scheduleNote();
+      $("scheduleModeLabel").textContent = params.scheduleMode === "filteredCurrentError"
+        ? "Filtered current error" : "Motion setpoint";
+
+      $("domainModeLabel").textContent = linear ? "Drive (inches)" : "Turn (degrees)";
+      $("commandSectionTitle").textContent = linear ? "Command distance" : "Command angle";
+      $("metricHeadingLabel").textContent = linear ? "Position" : "Heading";
+      $("pageTitle").textContent = linear
+        ? "Drive response across command distances"
+        : "Turn response across command angles";
+      $("pageSubtitle").textContent = linear
+        ? "Compare 6in through 144in, inspect the selected gain, then export the profile."
+        : "Compare 10° through 180°, inspect the selected gain, then export the profile.";
+      $("gainCardTag").textContent = linear ? "gain / inches" : "gain / degrees";
+      $("velocityCardTag").textContent = unit("vel");
+      $("poseCardTitle").textContent = linear ? "Robot position (not modeled)" : "Robot heading";
+      $("poseCardSubtitle").textContent = linear
+        ? "Straight-line position isn't visualized here - see the response/velocity/output charts below instead."
+        : "Cyan is current heading; gold is the target.";
+      $("responseCardTitle").textContent = linear ? "Normalized distance response" : "Normalized angle response";
+      $("responseCardSubtitle").textContent = linear
+        ? "Every preset is simulated with the same profile; 100% is its own commanded distance."
+        : "Every preset is simulated with the same profile; 100% is its own commanded angle.";
+      $("velocityCardTitle").textContent = linear ? "Linear velocity" : "Angular velocity";
+      $("velocityCardSubtitle").textContent = linear
+        ? "Selected command response in inches per second."
+        : "Selected command response in degrees per second.";
+      const poseSection = $("poseSection");
+      if (poseSection) poseSection.classList.toggle("hidden", linear);
 
       const pill = $("statusPill");
       pill.className = "status-pill";
@@ -1145,7 +1270,10 @@
     }
 
     function updateConfig() {
-      $("configOutput").textContent = `.proportional = {\n    .initial = ${params.initial.toFixed(6)}f,\n    .final = ${params.final.toFixed(6)}f,\n    .scale = ${params.scale.toFixed(2)}f,\n    .power = ${params.power.toFixed(2)}f,\n},\n.kI = ${params.kI.toFixed(6)}f,\n.kD = ${params.kD.toFixed(6)}f,\n.integralRange = ${params.integralRange.toFixed(2)}f,\n.integralSignReset = ${params.signReset},`;
+      const scheduleLines = params.scheduleMode === "filteredCurrentError"
+        ? `\n.scheduleMode = gen::GainScheduleMode::FilteredCurrentError,\n.scheduleAlpha = ${params.scheduleAlpha.toFixed(6)}f,`
+        : "";
+      $("configOutput").textContent = `.proportional = {\n    .initial = ${params.initial.toFixed(6)}f,\n    .final = ${params.final.toFixed(6)}f,\n    .scale = ${params.scale.toFixed(2)}f,\n    .power = ${params.power.toFixed(2)}f,\n},${scheduleLines}\n.derivativeAlpha = ${params.derivativeAlpha.toFixed(6)}f,\n.kI = ${params.kI.toFixed(6)}f,\n.kD = ${params.kD.toFixed(6)}f,\n.integralRange = ${params.integralRange.toFixed(2)}f,\n.integralSignReset = ${params.signReset},`;
     }
 
     function renderAll() {
@@ -1200,8 +1328,28 @@
       params.signReset = event.target.checked;
       scheduleRecompute();
     });
+    $("scheduleMode").addEventListener("change", (event) => {
+      params.scheduleMode = event.target.checked ? "filteredCurrentError" : "motionSetpoint";
+      scheduleRecompute();
+    });
+
+    function loadDomainDefaults(domain) {
+      params.domain = domain;
+      Object.assign(params, DOMAIN_PROFILES[domain]);
+      $("scheduleMode").checked = params.scheduleMode === "filteredCurrentError";
+      renderControls();
+      renderAngleButtons();
+      resetSimulation();
+    }
+
+    $("domainMode").addEventListener("change", (event) => {
+      loadDomainDefaults(event.target.checked ? "linear" : "angle");
+    });
+
     window.addEventListener("resize", () => requestAnimationFrame(renderAll));
 
+    $("scheduleMode").checked = params.scheduleMode === "filteredCurrentError";
+    $("domainMode").checked = params.domain === "linear";
     renderControls();
     renderAngleButtons();
     resetSimulation();

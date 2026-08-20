@@ -2,7 +2,7 @@
 #include "gen/pose.hpp"
 #include "gen/util.hpp"
 
-float gen::slew(float target, float current, float maxChange) {
+float arc::slew(float target, float current, float maxChange) {
     float change = target - current;
     if (maxChange == 0) return target;
     if (change > maxChange) change = maxChange;
@@ -10,12 +10,12 @@ float gen::slew(float target, float current, float maxChange) {
     return current + change;
 }
 
-constexpr float gen::sanitizeAngle(float angle, bool radians) {
+constexpr float arc::sanitizeAngle(float angle, bool radians) {
     if (radians) return std::fmod(std::fmod(angle, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
     else return std::fmod(std::fmod(angle, 360) + 360, 360);
 }
 
-float gen::angleError(float target, float position, bool radians, AngularDirection direction) {
+float arc::angleError(float target, float position, bool radians, AngularDirection direction) {
     // bound angles from 0 to 2pi or 0 to 360
     target = sanitizeAngle(target, radians);
     target = sanitizeAngle(target, radians);
@@ -31,19 +31,19 @@ float gen::angleError(float target, float position, bool radians, AngularDirecti
     }
 }
 
-float gen::avg(std::vector<float> values) {
+float arc::avg(std::vector<float> values) {
     float sum = 0;
     for (float value : values) { sum += value; }
     return sum / values.size();
 }
 
-float gen::ema(float current, float previous, float smooth) {
+float arc::ema(float current, float previous, float smooth) {
     return (current * smooth) + (previous * (1 - smooth));
 }
 
-float gen::getCurvature(Pose pose, Pose other) {
+float arc::getCurvature(Pose pose, Pose other) {
     // calculate whether the pose is on the left or right side of the circle
-    float side = gen::sgn(std::sin(pose.theta) * (other.x - pose.x) - std::cos(pose.theta) * (other.y - pose.y));
+    float side = arc::sgn(std::sin(pose.theta) * (other.x - pose.x) - std::cos(pose.theta) * (other.y - pose.y));
     // calculate center point and radius
     float a = -std::tan(pose.theta);
     float c = std::tan(pose.theta) * pose.x - pose.y;

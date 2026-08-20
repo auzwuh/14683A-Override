@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace gen {
+namespace arc {
 /**
  * @brief A pose in 2D space
  *
@@ -29,11 +29,11 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create a pose
-         * gen::Pose poseA(5, // x position
+         * arc::Pose poseA(5, // x position
          *                    10, // y position
          *                    1.57); // heading
          * // create a pose
-         * gen::Pose poseB(5.2, 22); // x and y position, heading defaults to 0
+         * arc::Pose poseB(5.2, 22); // x and y position, heading defaults to 0
          * @endcode
          */
         Pose(float x, float y, float theta = 0);
@@ -48,11 +48,11 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create a pose
-         * gen::Pose poseA(5, 10, 1.57);
+         * arc::Pose poseA(5, 10, 1.57);
          * // create a pose
-         * gen::Pose poseB(5.2, 22, 2.22);
+         * arc::Pose poseB(5.2, 22, 2.22);
          * // add the two poses
-         * gen::Pose poseC = poseA + poseB;
+         * arc::Pose poseC = poseA + poseB;
          * // poseC.x = 10.2, poseC.y = 32, poseC.theta = 1.57
          * @endcode
          */
@@ -68,11 +68,11 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create a pose
-         * gen::Pose poseA(5, 10, 1.57);
+         * arc::Pose poseA(5, 10, 1.57);
          * // create a pose
-         * gen::Pose poseB(5.2, 22, 2.22);
+         * arc::Pose poseB(5.2, 22, 2.22);
          * // subtract the two poses
-         * gen::Pose poseC = poseA - poseB;
+         * arc::Pose poseC = poseA - poseB;
          * // poseC.x = -0.2, poseC.y = -12, poseC.theta = 1.57
          * @endcode
          */
@@ -88,9 +88,9 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create a pose
-         * gen::Pose poseA(5, 10, 1.57);
+         * arc::Pose poseA(5, 10, 1.57);
          * // create a pose
-         * gen::Pose poseB(5.2, 22, 2.22);
+         * arc::Pose poseB(5.2, 22, 2.22);
          * // multiply the two poses
          * float result = poseA * poseB; // 246
          * @endcode
@@ -107,9 +107,9 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create a pose
-         * gen::Pose pose(1, 2);
+         * arc::Pose pose(1, 2);
          * // multiply the pose by 4.0
-         * gen::Pose result = pose * 4.0;
+         * arc::Pose result = pose * 4.0;
          * // result.x = 4, result.y = 8
          * @endcode
          */
@@ -125,9 +125,9 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create a pose
-         * gen::Pose pose(6, 8);
+         * arc::Pose pose(6, 8);
          * // divide the pose by 2
-         * gen::Pose result = pose / 2;
+         * arc::Pose result = pose / 2;
          * // result.x = 3, result.y = 4
          * @endcode
          */
@@ -144,10 +144,10 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create poses
-         * gen::Pose poseA(0, 0);
-         * gen::Pose poseB(0, 2);
+         * arc::Pose poseA(0, 0);
+         * arc::Pose poseB(0, 2);
          * // find the pose in between the 2 poses
-         * gen::Pose result = poseA.lerp(poseB, 0.5);
+         * arc::Pose result = poseA.lerp(poseB, 0.5);
          * // result.x = 0, result.y = 1
          * @endcode
          */
@@ -163,8 +163,8 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create poses
-         * gen::Pose poseA(0, 0);
-         * gen::Pose poseB(3, 4);
+         * arc::Pose poseA(0, 0);
+         * arc::Pose poseB(3, 4);
          * // find the distance between the poses
          * float result = poseA.distance(poseB); // result = 5
          * @endcode
@@ -181,8 +181,8 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create poses
-         * gen::Pose poseA(-1, -2);
-         * gen::Pose poseB(2, 1);
+         * arc::Pose poseA(-1, -2);
+         * arc::Pose poseB(2, 1);
          * // find angle between poses
          * float result = poseA.angle(poseB); // result = 0.785398
          * @endcode
@@ -199,9 +199,9 @@ class Pose {
          * @b Example
          * @code {.cpp}
          * // create pose
-         * gen::Pose pose(1, 0);
+         * arc::Pose pose(1, 0);
          * // rotate pose by pi/2
-         * gen::Pose result = pose.rotate(M_PI_2);
+         * arc::Pose result = pose.rotate(M_PI_2);
          * // result.x = 0, result.y = 1
          * @endcode
          */
@@ -215,4 +215,4 @@ class Pose {
  * @return std::string
  */
 std::string format_as(const Pose& pose);
-} // namespace gen
+} // namespace arc

@@ -8,7 +8,7 @@
 #include "pros/imu.hpp"
 #include "pros/rtos.hpp"
 
-namespace gen {
+namespace arc {
 
 class OdomSensors {
     public:
@@ -172,6 +172,22 @@ struct APSParams {
     bool async = false;
 };
 
+// Uses the same exported-path asset format as followPursuit/followStanley
+// (x, y, speed[-127..127] rows). Internally builds a arc::path::Reference
+// each tick and runs it through arc::path::RamseteLQRController - see
+// docs/path_following_notebook.md for what b/zeta mean and why this
+// controller was picked.
+struct RamseteLQRParams {
+    int timeout = useProfileTimeout;
+    float velocityExit = useProfileExit;
+    float errorExit = useProfileExit;
+    bool forwards = true;
+    float maxSpeed = 127.0f;
+    float b = 0.00129032f;
+    float zeta = 0.7f;
+    bool async = false;
+};
+
 class Chassis {
     public:
         Chassis(Drivetrain drivetrain, ControllerSettings linearSettings, ControllerSettings angularSettings,
@@ -203,6 +219,9 @@ class Chassis {
         void followPursuit(const asset& path, PursuitParams params = {});
         void followStanley(const asset& path, StanleyParams params = {});
         void followAPS(const asset& path, APSParams params = {});
+        // Thin wrapper - see arc::followRamseteLQR() below, same relationship
+        // as Chassis::getPose()/arc::getPose().
+        void followRamseteLQR(const asset& path, RamseteLQRParams params = {});
 
         void tank(int left, int right);
         void arcade(int throttle, int turn, float desaturateBias = 0.5f);
@@ -238,6 +257,16 @@ class Chassis {
                              float maxSpeed, float minSpeed, int timeout, float velocityExit, float errorExit,
                              int settleTimeMs);
         pros::Mutex mutex;
+
+        // Needs protected access (drivetrain, motionRunning, distTraveled, ...)
+        // the same way every other motion here does - see definition below.
+        friend void followRamseteLQR(Chassis& chassis, const asset& path, RamseteLQRParams params);
 };
 
-} // namespace gen
+// The real implementation of Chassis::followRamseteLQR(). Free-function form,
+// same relationship as arc::getPose()/arc::setPose() in odom.hpp: call it
+// either as chassis.followRamseteLQR(path, params) or as
+// arc::followRamseteLQR(chassis, path, params) - both reach this function.
+void followRamseteLQR(Chassis& chassis, const asset& path, RamseteLQRParams params = {});
+
+} // namespace arc

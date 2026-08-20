@@ -3,3 +3,6 @@
 .vscode/
 bin/
 compile_commands.json
+
+# Claude worktree/agent scratch
+.claude/

@@ -4,7 +4,7 @@
 #include "pros/motor_group.hpp"
 #include "pros/motors.h"
 
-gen::TrackingWheel::TrackingWheel(pros::adi::Encoder* encoder, float wheelDiameter, float distance,
+arc::TrackingWheel::TrackingWheel(pros::adi::Encoder* encoder, float wheelDiameter, float distance,
                                      float gearRatio) {
     this->encoder = encoder;
     this->diameter = wheelDiameter;
@@ -12,14 +12,14 @@ gen::TrackingWheel::TrackingWheel(pros::adi::Encoder* encoder, float wheelDiamet
     this->gearRatio = gearRatio;
 }
 
-gen::TrackingWheel::TrackingWheel(pros::Rotation* encoder, float wheelDiameter, float distance, float gearRatio) {
+arc::TrackingWheel::TrackingWheel(pros::Rotation* encoder, float wheelDiameter, float distance, float gearRatio) {
     this->rotation = encoder;
     this->diameter = wheelDiameter;
     this->distance = distance;
     this->gearRatio = gearRatio;
 }
 
-gen::TrackingWheel::TrackingWheel(pros::MotorGroup* motors, float wheelDiameter, float distance, float rpm) {
+arc::TrackingWheel::TrackingWheel(pros::MotorGroup* motors, float wheelDiameter, float distance, float rpm) {
     this->motors = motors;
     this->motors->set_encoder_units_all(pros::E_MOTOR_ENCODER_ROTATIONS);
     this->diameter = wheelDiameter;
@@ -27,13 +27,13 @@ gen::TrackingWheel::TrackingWheel(pros::MotorGroup* motors, float wheelDiameter,
     this->rpm = rpm;
 }
 
-void gen::TrackingWheel::reset() {
+void arc::TrackingWheel::reset() {
     if (this->encoder != nullptr) this->encoder->reset();
     if (this->rotation != nullptr) this->rotation->reset_position();
     if (this->motors != nullptr) this->motors->tare_position_all();
 }
 
-float gen::TrackingWheel::getDistanceTraveled() {
+float arc::TrackingWheel::getDistanceTraveled() {
     if (this->encoder != nullptr) {
         return (float(this->encoder->get_value()) * this->diameter * M_PI / 360) / this->gearRatio;
     } else if (this->rotation != nullptr) {
@@ -53,15 +53,15 @@ float gen::TrackingWheel::getDistanceTraveled() {
             }
             distances.push_back(positions[i] * (diameter * M_PI) * (rpm / in));
         }
-        return gen::avg(distances);
+        return arc::avg(distances);
     } else {
         return 0;
     }
 }
 
-float gen::TrackingWheel::getOffset() { return this->distance; }
+float arc::TrackingWheel::getOffset() { return this->distance; }
 
-int gen::TrackingWheel::getType() {
+int arc::TrackingWheel::getType() {
     if (this->motors != nullptr) return 1;
     return 0;
 }

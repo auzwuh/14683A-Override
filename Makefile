@@ -42,6 +42,29 @@ TEMPLATE_FILES=$(INCDIR)/$(LIBNAME)/*.h $(INCDIR)/$(LIBNAME)/*.hpp
 .DEFAULT_GOAL=quick
 
 ################################################################################
+# Static asset pipeline
+#
+# Every file under static/ gets objcopy'd into a linkable .o blob and pulled
+# into the final binary, so PATH_FOLLOW-style code can read it back with the
+# ASSET() macro (include/gen/asset.hpp). objcopy names the embedded symbols
+# after the exact relative input path with every non-alnum character turned
+# into '_', so a file at static/examplePath.txt becomes:
+#   _binary_static_examplePath_txt_start / _end / _size
+# which is exactly what ASSET(examplePath_txt) expects. Atticus Terminal's
+# codegen (mod/codegen.py, generate_path_asset_name) already assumes this
+# convention when it emits ASSET(...) declarations for exported paths.
+STATIC_DIR:=static
+STATIC_SRC:=$(wildcard $(STATIC_DIR)/*)
+STATIC_OBJ:=$(addprefix $(BINDIR)/,$(addsuffix .o,$(STATIC_SRC)))
+
+$(BINDIR)/$(STATIC_DIR)/%.o: $(STATIC_DIR)/%
+	$(VV)mkdir -p $(dir $@)
+	$(call test_output_2,Embedding $< ,$(OBJCOPY) -I binary -O elf32-littlearm -B arm $< $@,$(DONE_STRING))
+
+ELF_DEPS+=$(STATIC_OBJ)
+################################################################################
+
+################################################################################
 ################################################################################
 ########## Nothing below this line should be edited by typical users ###########
 -include ./common.mk

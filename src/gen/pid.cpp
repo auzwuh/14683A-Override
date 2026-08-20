@@ -3,7 +3,7 @@
 
 #include "gen/pid.hpp"
 
-namespace gen {
+namespace arc {
 
 float AsymptoticGains::at(float setpoint) const {
     const float magnitude = std::pow(std::fabs(setpoint), power);
@@ -61,4 +61,4 @@ float PID::getError() const { return error; }
 
 float PID::getProportionalGain() const { return proportionalGain; }
 
-} // namespace gen
+} // namespace arc

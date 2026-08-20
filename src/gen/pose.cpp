@@ -3,44 +3,44 @@
 
 #include "gen/pose.hpp"
 
-gen::Pose::Pose(float x, float y, float theta) {
+arc::Pose::Pose(float x, float y, float theta) {
     this->x = x;
     this->y = y;
     this->theta = theta;
 }
 
-gen::Pose gen::Pose::operator+(const gen::Pose& other) const {
-    return gen::Pose(this->x + other.x, this->y + other.y, this->theta);
+arc::Pose arc::Pose::operator+(const arc::Pose& other) const {
+    return arc::Pose(this->x + other.x, this->y + other.y, this->theta);
 }
 
-gen::Pose gen::Pose::operator-(const gen::Pose& other) const {
-    return gen::Pose(this->x - other.x, this->y - other.y, this->theta);
+arc::Pose arc::Pose::operator-(const arc::Pose& other) const {
+    return arc::Pose(this->x - other.x, this->y - other.y, this->theta);
 }
 
-float gen::Pose::operator*(const gen::Pose& other) const { return this->x * other.x + this->y * other.y; }
+float arc::Pose::operator*(const arc::Pose& other) const { return this->x * other.x + this->y * other.y; }
 
-gen::Pose gen::Pose::operator*(const float& other) const {
-    return gen::Pose(this->x * other, this->y * other, this->theta);
+arc::Pose arc::Pose::operator*(const float& other) const {
+    return arc::Pose(this->x * other, this->y * other, this->theta);
 }
 
-gen::Pose gen::Pose::operator/(const float& other) const {
-    return gen::Pose(this->x / other, this->y / other, this->theta);
+arc::Pose arc::Pose::operator/(const float& other) const {
+    return arc::Pose(this->x / other, this->y / other, this->theta);
 }
 
-gen::Pose gen::Pose::lerp(gen::Pose other, float t) const {
-    return gen::Pose(this->x + (other.x - this->x) * t, this->y + (other.y - this->y) * t, this->theta);
+arc::Pose arc::Pose::lerp(arc::Pose other, float t) const {
+    return arc::Pose(this->x + (other.x - this->x) * t, this->y + (other.y - this->y) * t, this->theta);
 }
 
-float gen::Pose::distance(gen::Pose other) const { return std::hypot(this->x - other.x, this->y - other.y); }
+float arc::Pose::distance(arc::Pose other) const { return std::hypot(this->x - other.x, this->y - other.y); }
 
-float gen::Pose::angle(gen::Pose other) const { return std::atan2(other.y - this->y, other.x - this->x); }
+float arc::Pose::angle(arc::Pose other) const { return std::atan2(other.y - this->y, other.x - this->x); }
 
-gen::Pose gen::Pose::rotate(float angle) const {
-    return gen::Pose(this->x * std::cos(angle) - this->y * std::sin(angle),
+arc::Pose arc::Pose::rotate(float angle) const {
+    return arc::Pose(this->x * std::cos(angle) - this->y * std::sin(angle),
                         this->x * std::sin(angle) + this->y * std::cos(angle), this->theta);
 }
 
-std::string gen::format_as(const gen::Pose& pose) {
+std::string arc::format_as(const arc::Pose& pose) {
     // the double brackets become single brackets
-    return fmt::format("gen::Pose {{ x: {}, y: {}, theta: {} }}", pose.x, pose.y, pose.theta);
+    return fmt::format("arc::Pose {{ x: {}, y: {}, theta: {} }}", pose.x, pose.y, pose.theta);
 }

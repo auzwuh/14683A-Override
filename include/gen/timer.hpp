@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace gen {
+namespace arc {
 class Timer {
     public:
         /**
@@ -197,4 +197,4 @@ class Timer {
         uint32_t timeWaited = 0;
         bool paused = false;
 };
-} // namespace gen
+} // namespace arc

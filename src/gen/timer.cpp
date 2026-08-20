@@ -1,7 +1,7 @@
 #include "pros/rtos.hpp"
 #include "gen/timer.hpp"
 
-using namespace gen;
+using namespace arc;
 
 Timer::Timer(uint32_t time)
     : period(time) {

@@ -3,14 +3,14 @@
 #include "gen/chassis/chassis.hpp"
 #include "gen/pose.hpp"
 
-namespace gen {
+namespace arc {
 /**
  * @brief Set the sensors to be used for odometry
  *
  * @param sensors the sensors to be used
  * @param drivetrain drivetrain to be used
  */
-void setSensors(gen::OdomSensors sensors, gen::Drivetrain drivetrain);
+void setSensors(arc::OdomSensors sensors, arc::Drivetrain drivetrain);
 /**
  * @brief Get the pose of the robot
  *
@@ -29,14 +29,14 @@ void setPose(Pose pose, bool radians = false);
  * @brief Get the speed of the robot
  *
  * @param radians true for theta in radians, false for degrees. False by default
- * @return gen::Pose
+ * @return arc::Pose
  */
 Pose getSpeed(bool radians = false);
 /**
  * @brief Get the local speed of the robot
  *
  * @param radians true for theta in radians, false for degrees. False by default
- * @return gen::Pose
+ * @return arc::Pose
  */
 Pose getLocalSpeed(bool radians = false);
 /**
@@ -44,7 +44,7 @@ Pose getLocalSpeed(bool radians = false);
  *
  * @param time time in seconds
  * @param radians False for degrees, true for radians. False by default
- * @return gen::Pose
+ * @return arc::Pose
  */
 Pose estimatePose(float time, bool radians = false);
 /**
@@ -57,4 +57,4 @@ void update();
  *
  */
 void init();
-} // namespace gen
+} // namespace arc

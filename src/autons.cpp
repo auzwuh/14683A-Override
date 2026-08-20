@@ -1,168 +1,177 @@
 #include "autons.hpp"
 
+#include "macros.hpp"
 #include "gen/chassis/chassis.hpp"
 #include "gen/electronics.h"
 #include "pros/rtos.hpp"
 
-// Defined in main.cpp alongside the rest of the User Template.
-extern gen::Chassis chassis;
-extern gen::MotorGroup intake;
-extern gen::MotorGroup lift;
-extern gen::MotorGroup claw;
-extern gen::MotorGroup clawRot;
+#include <cstdlib>
+
+extern arc::Chassis chassis;
+extern arc::MotorGroup intake;
+extern arc::MotorGroup lift;
+extern arc::MotorGroup claw;
+extern arc::MotorGroup clawRot;
+
+
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// TUNE THESE ON THE REAL ROBOT.  They are placeholders carried over from the
-// ATTICUS mechanism presets and have never been measured against hardware.
-// Every one is a motor position in degrees.
-// ---------------------------------------------------------------------------
-constexpr int CLAW_GRIP = 0;      // claw closed on a Pin
-constexpr int CLAW_OPEN = -75;    // claw released
+using namespace robot::tune;
 
-// lift: 0 = stowed, 310 = Short Goal height, 470 = Tall Goal, 700 = Toggle
-// clawRot: 0 = stowed, 160 = scoring, 300 = flipped
-
-}  // namespace
-
-void Auton::overrideAwpRed() {
-    chassis.setPose(-36.000f, 64.590f, 180.00f);
-    chassis.moveToPoint(-36.000f, 59.000f, {.timeout = 636, .async = true});
-    chassis.waitUntil(0.000f);
-    lift.move_absolute(310, 100);
-    clawRot.move_absolute(160, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(-5.110f, 48.000f, {.timeout = 1022});
-    // pure-pursuit path 'override_awp_red_seg1_path_txt' expanded to 5 waypoints (no static/ asset pipeline)
-    chassis.moveToPoint(-36.000f, 59.000f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 88.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-26.074f, 60.164f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 78.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-16.492f, 57.926f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 62.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-11.266f, 49.783f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 43.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-5.110f, 48.000f, {.timeout = 499, .errorExit = 2.0f, .maxSpeed = 64.0f, .minSpeed = 45.0f, .settle = false});
-    chassis.turnToPoint(-15.110f, 48.000f, {.timeout = 430, .forwards = false});
-    chassis.moveToPoint(-15.110f, 48.000f, {.timeout = 982, .forwards = false});
-    claw.move_absolute(CLAW_OPEN, 100);
-    pros::delay(300);
-    chassis.moveToPoint(-9.500f, 48.000f, {.timeout = 736, .errorExit = 3.84f, .minSpeed = 81.0f, .settle = false, .async = true});
-    chassis.waitUntil(0.000f);
-    clawRot.move_absolute(0, 100);
-    lift.move_absolute(0, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(54.000f, -0.000f, {.timeout = 527, .errorExit = 2.25f, .direction = gen::AngularDirection::CCW_COUNTERCLOCKWISE, .lockedSide = gen::LockedSide::LEFT, .minSpeed = 40.0f});
-    chassis.moveToPoint(-0.000f, 54.000f, {.timeout = 742, .errorExit = 5.06f, .minSpeed = 73.0f, .settle = false});
-    chassis.moveToPoint(-0.000f, 64.700f, {.timeout = 880});
-    // localizer.applyImmediateCorrectionAuto();   // no Atticus localizer on this robot
-    pros::delay(250);
-    intake.move(127);
-    chassis.moveToPoint(-0.000f, 61.000f, {.timeout = 518, .forwards = false});
-    chassis.moveToPoint(-0.000f, 64.700f, {.timeout = 518});
-    pros::delay(250);
-    intake.move(0);
-    claw.move_absolute(CLAW_GRIP, 100);
-    pros::delay(1000);
-    chassis.moveToPoint(-0.000f, 48.000f, {.timeout = 1099, .forwards = false, .async = true});
-    chassis.waitUntil(0.000f);
-    lift.move_absolute(310, 100);
-    clawRot.move_absolute(160, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(15.110f, 48.000f, {.timeout = 1120, .forwards = false});
-    chassis.moveToPoint(15.110f, 48.000f, {.timeout = 1211, .forwards = false});
-    claw.move_absolute(CLAW_OPEN, 100);
-    pros::delay(300);
-    chassis.moveToPoint(6.000f, 48.000f, {.timeout = 937, .async = true});
-    chassis.waitUntil(0.000f);
-    clawRot.move_absolute(0, 100);
-    lift.move_absolute(0, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(-54.000f, -0.000f, {.timeout = 645});
-    // pure-pursuit path 'override_awp_red_seg11_path_txt' expanded to 10 waypoints (no static/ asset pipeline)
-    chassis.moveToPoint(6.000f, 48.000f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-1.307f, 41.177f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-9.342f, 35.248f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 90.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-18.991f, 33.804f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-28.886f, 35.068f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 63.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-34.734f, 28.087f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 99.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-35.929f, 18.160f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 98.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-40.274f, 9.413f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 96.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-48.253f, 3.409f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(-54.000f, -0.000f, {.timeout = 387, .errorExit = 2.0f, .maxSpeed = 105.0f, .minSpeed = 45.0f, .settle = false});
-    chassis.moveToPoint(-64.700f, -0.000f, {.timeout = 880});
-    pros::delay(250);
-    chassis.moveToPoint(-61.000f, -0.000f, {.timeout = 518, .forwards = false});
-    chassis.moveToPoint(-64.700f, -0.000f, {.timeout = 518});
-    // localizer.applyImmediateCorrectionAuto();   // no Atticus localizer on this robot
-    pros::delay(250);
-    chassis.moveToPoint(-48.000f, -0.000f, {.timeout = 1099, .forwards = false});
+bool waitLift(int target, int timeoutMs) {
+    const std::uint32_t deadline = pros::millis() + static_cast<std::uint32_t>(timeoutMs);
+    while (pros::millis() < deadline) {
+        if (std::abs(static_cast<int>(lift.get_position()) - target) <= LIFT_TOL) return true;
+        pros::delay(10);
+    }
+    return false;
 }
 
-void Auton::overrideAwpBlue() {
-    chassis.setPose(36.000f, -64.590f, 0.00f);
-    chassis.moveToPoint(36.000f, -59.000f, {.timeout = 636, .async = true});
-    chassis.waitUntil(0.000f);
-    lift.move_absolute(310, 100);
-    clawRot.move_absolute(160, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(5.110f, -48.000f, {.timeout = 1022});
-    // pure-pursuit path 'override_awp_blue_seg1_path_txt' expanded to 5 waypoints (no static/ asset pipeline)
-    chassis.moveToPoint(36.000f, -59.000f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 88.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(26.074f, -60.164f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 78.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(16.492f, -57.926f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 62.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(11.266f, -49.783f, {.timeout = 499, .errorExit = 3.0f, .maxSpeed = 43.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(5.110f, -48.000f, {.timeout = 499, .errorExit = 2.0f, .maxSpeed = 64.0f, .minSpeed = 45.0f, .settle = false});
-    chassis.turnToPoint(15.110f, -48.000f, {.timeout = 430, .forwards = false});
-    chassis.moveToPoint(15.110f, -48.000f, {.timeout = 982, .forwards = false});
-    claw.move_absolute(CLAW_OPEN, 100);
-    pros::delay(300);
-    chassis.moveToPoint(9.500f, -48.000f, {.timeout = 736, .errorExit = 3.84f, .minSpeed = 81.0f, .settle = false, .async = true});
-    chassis.waitUntil(0.000f);
-    clawRot.move_absolute(0, 100);
-    lift.move_absolute(0, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(-54.000f, -0.000f, {.timeout = 527, .errorExit = 2.25f, .direction = gen::AngularDirection::CCW_COUNTERCLOCKWISE, .lockedSide = gen::LockedSide::LEFT, .minSpeed = 40.0f});
-    chassis.moveToPoint(-0.000f, -54.000f, {.timeout = 742, .errorExit = 5.06f, .minSpeed = 73.0f, .settle = false});
-    chassis.moveToPoint(-0.000f, -64.700f, {.timeout = 880});
-    // localizer.applyImmediateCorrectionAuto();   // no Atticus localizer on this robot
-    pros::delay(250);
-    intake.move(127);
-    chassis.moveToPoint(-0.000f, -61.000f, {.timeout = 518, .forwards = false});
-    chassis.moveToPoint(-0.000f, -64.700f, {.timeout = 518});
-    pros::delay(250);
-    intake.move(0);
-    claw.move_absolute(CLAW_GRIP, 100);
-    pros::delay(1000);
-    chassis.moveToPoint(-0.000f, -48.000f, {.timeout = 1099, .forwards = false, .async = true});
-    chassis.waitUntil(0.000f);
-    lift.move_absolute(310, 100);
-    clawRot.move_absolute(160, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(-15.110f, -48.000f, {.timeout = 1120, .forwards = false});
-    chassis.moveToPoint(-15.110f, -48.000f, {.timeout = 1211, .forwards = false});
-    claw.move_absolute(CLAW_OPEN, 100);
-    pros::delay(300);
-    chassis.moveToPoint(-6.000f, -48.000f, {.timeout = 937, .async = true});
-    chassis.waitUntil(0.000f);
-    clawRot.move_absolute(0, 100);
-    lift.move_absolute(0, 100);
-    chassis.waitUntilDone();
-    chassis.turnToPoint(54.000f, -0.000f, {.timeout = 645});
-    // pure-pursuit path 'override_awp_blue_seg11_path_txt' expanded to 10 waypoints (no static/ asset pipeline)
-    chassis.moveToPoint(-6.000f, -48.000f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(1.307f, -41.177f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(9.342f, -35.248f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 90.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(18.991f, -33.804f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(28.886f, -35.068f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 63.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(34.734f, -28.087f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 99.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(35.929f, -18.160f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 98.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(40.274f, -9.413f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 96.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(48.253f, -3.409f, {.timeout = 387, .errorExit = 3.0f, .maxSpeed = 105.0f, .minSpeed = 30.0f, .settle = false});
-    chassis.moveToPoint(54.000f, -0.000f, {.timeout = 387, .errorExit = 2.0f, .maxSpeed = 105.0f, .minSpeed = 45.0f, .settle = false});
-    chassis.moveToPoint(64.700f, -0.000f, {.timeout = 880});
-    pros::delay(250);
-    chassis.moveToPoint(61.000f, -0.000f, {.timeout = 518, .forwards = false});
-    chassis.moveToPoint(64.700f, -0.000f, {.timeout = 518});
-    // localizer.applyImmediateCorrectionAuto();   // no Atticus localizer on this robot
-    pros::delay(250);
-    chassis.moveToPoint(48.000f, -0.000f, {.timeout = 1099, .forwards = false});
+bool waitRot(int target, int timeoutMs) {
+    const std::uint32_t deadline = pros::millis() + static_cast<std::uint32_t>(timeoutMs);
+    while (pros::millis() < deadline) {
+        if (std::abs(static_cast<int>(clawRot.get_position()) - target) <= ROT_TOL) return true;
+        pros::delay(10);
+    }
+    return false;
 }
 
+
+void liftTo(int deg) {
+    const bool descending = lift.get_position() > deg;
+    lift.move_absolute(deg, descending ? LIFT_DOWN_VEL : LIFT_UP_VEL);
+}
+
+
+void present(int liftDeg) {
+    liftTo(liftDeg);
+    waitLift(LIFT_ROT_CLEAR, 800);
+    clawRot.move_absolute(ROT_SCORE, ROT_VEL);
+}
+
+constexpr float SPD_PIN_IN  = 22.5f;   // ~10.3 in/s - threading into the cluster
+constexpr float SPD_PIN_OUT = 41.0f;   // ~18.9 in/s - withdrawing with the Pin
+constexpr float SPD_GOAL    = 45.0f;   // ~20.7 in/s - placing onto a loaded Goal
+
+int scoreHeight(int pinsOnGoal) {
+    return LIFT_SHORT + pinsOnGoal * PIN_NEST_DEG;
+}
+
+void stowArm() {
+    clawRot.move_absolute(ROT_STOW, ROT_VEL);
+    waitRot(ROT_STOW, 600);
+    liftTo(LIFT_STOW);
+}
+
+//
+//   x' = m00*x + m01*y
+//   y' = m10*x + m11*y
+//   theta' = mirror ? (c - theta) : (c + theta)
+//
+struct Frame {
+    float m00, m01, m10, m11;
+    bool mirror;
+    float c;
+    int rams;     // red needs TWO hits, blue ONE.
+};
+
+constexpr Frame kRedLeft   = { 1,  0,  0,  1, false,   0.0f, 2};
+constexpr Frame kRedBottom = { 0, -1, -1,  0, true,  270.0f, 2};
+constexpr Frame kBlueRight = {-1,  0,  0, -1, false, 180.0f, 1};
+constexpr Frame kBlueTop   = { 0,  1,  1,  0, true,   90.0f, 1};
+
+struct Pt {
+    float x, y;
+};
+
+Pt map(const Frame& f, float x, float y) {
+    return {f.m00 * x + f.m01 * y, f.m10 * x + f.m11 * y};
+}
+
+float mapTheta(const Frame& f, float theta) {
+    const float t = f.mirror ? (f.c - theta) : (f.c + theta);
+    return t < 0.0f ? t + 360.0f : (t >= 360.0f ? t - 360.0f : t);
+}
+
+
+void runQuadrant(const Frame& f) {
+    const Pt start   = map(f,  0.00000f, 63.2057f);   // front flat on the wall
+    const Pt ramHome = map(f,  0.00000f, 61.0000f);   // clear of the Toggle face
+    const Pt ramHit  = map(f,  0.00000f, 64.7000f);   // commanded past the wall
+    const Pt standby = map(f,  4.83000f, 48.0000f);   // clear of the Goal, free to pivot
+    const Pt score   = map(f, 15.11000f, 48.0000f);   // aligner pressed on the Goal
+    const Pt lead    = map(f,  7.91446f, 48.0000f);   // on the Goal axis, 40 deg ray
+    const Pt pin     = map(f, 18.99269f, 34.7975f);   // cluster Pin, front-first
+    const Pt finish  = map(f,  7.00000f, 48.0000f);   // peeled off, clear of perimeter
+
+    chassis.setPose(start.x, start.y, mapTheta(f, 0.0f));
+
+    liftTo(LIFT_TOGGLE);
+    chassis.moveToPoint(ramHome.x, ramHome.y, {.timeout = 462, .forwards = false, .async = true});
+    chassis.waitUntilDone();
+    waitLift(LIFT_TOGGLE, 1200);
+
+    for (int i = 0; i < f.rams; ++i) {
+        // Target is past the wall on purpose: the drive stalls into the Toggle.
+        chassis.moveToPoint(ramHit.x, ramHit.y, {.timeout = 598});
+        pros::delay(400);
+        chassis.moveToPoint(ramHome.x, ramHome.y, {.timeout = 518, .forwards = false});
+        pros::delay(100);
+    }
+    chassis.turnToPoint(standby.x, standby.y, {.timeout = 431, .forwards = false});
+    chassis.moveToPoint(standby.x, standby.y, {.timeout = 1002, .forwards = false});
+    pros::delay(100);
+    chassis.turnToPoint(score.x, score.y, {.timeout = 985, .forwards = false});
+    chassis.moveToPoint(score.x, score.y,
+                        {.timeout = 1500, .forwards = false, .maxSpeed = SPD_GOAL, .async = true});
+
+    // WINCH: lift first, rotator only once it clears the frame.
+    // ONE Pin is already nested on this Short Goal at the start of the Match.
+    present(scoreHeight(1));
+    chassis.waitUntilDone();
+    // The aligner is pressed on the Goal now 
+    claw.move_absolute(CLAW_OPEN, CLAW_VEL);
+    pros::delay(350);
+
+    chassis.moveToPoint(lead.x, lead.y, {.timeout = 833});
+    pros::delay(100);
+    chassis.turnToPoint(pin.x, pin.y, {.timeout = 1371});
+    chassis.moveToPoint(pin.x, pin.y,
+                        {.timeout = 3725, .maxSpeed = SPD_PIN_IN, .async = true});
+
+    clawRot.move_absolute(ROT_STOW, ROT_VEL);
+    chassis.waitUntil(7.755596f);
+    intake.move(127);
+    waitRot(ROT_STOW, 400);
+    liftTo(LIFT_STOW);
+    chassis.waitUntilDone();
+
+    pros::delay(450);
+    claw.move_absolute(CLAW_GRIP, CLAW_VEL);
+    pros::delay(900);
+
+    chassis.moveToPoint(lead.x, lead.y,
+                        {.timeout = 2284, .forwards = false, .maxSpeed = SPD_PIN_OUT});
+    pros::delay(100);
+    chassis.turnToPoint(score.x, score.y, {.timeout = 1371, .forwards = false});
+    chassis.moveToPoint(score.x, score.y,
+                        {.timeout = 1217, .forwards = false, .maxSpeed = SPD_GOAL, .async = true});
+    intake.move(0);
+    // TWO Pins on the Goal now: the pre-placed yellow one and our preload.
+    present(scoreHeight(2));
+    chassis.waitUntilDone();
+    pros::delay(550);
+    claw.move_absolute(CLAW_OPEN, CLAW_VEL);
+    pros::delay(350);
+
+    chassis.moveToPoint(finish.x, finish.y, {.timeout = 885});
+    stowArm();
+}
+
+}
+
+void Auton::overrideRedLeft()   { runQuadrant(kRedLeft); }
+void Auton::overrideRedBottom() { runQuadrant(kRedBottom); }
+void Auton::overrideBlueRight() { runQuadrant(kBlueRight); }
+void Auton::overrideBlueTop()   { runQuadrant(kBlueTop); }

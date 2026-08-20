@@ -4,7 +4,7 @@
 #include "gen/util.hpp"
 #include "pros/rtos.hpp"
 
-namespace gen {
+namespace arc {
 
 bool ExitCondition::error(float currentError, float threshold) {
     return threshold >= 0.0f && std::fabs(currentError) > threshold;
@@ -40,4 +40,4 @@ Settler Settler::operator|(const Settler& other) const {
 
 bool Settler::isSettled() const { return condition(); }
 
-} // namespace gen
+} // namespace arc

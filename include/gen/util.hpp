@@ -5,7 +5,7 @@
 #include "gen/chassis/chassis.hpp"
 #include "gen/pose.hpp"
 
-namespace gen {
+namespace arc {
 /**
  * @brief Slew rate limiter
  *
@@ -163,4 +163,4 @@ float ema(float current, float previous, float smooth);
  * @endcode
  */
 float getCurvature(Pose pose, Pose other);
-} // namespace gen
+} // namespace arc

@@ -5,7 +5,7 @@
 #include "pros/adi.hpp"
 #include "pros/rotation.hpp"
 
-namespace gen {
+namespace arc {
 
 /**
  * @brief A namespace representing the size of omniwheels.
@@ -46,7 +46,7 @@ class TrackingWheel {
          * // it's also 5 inches away from the tracking center. This tracking wheel is to the left
          * // of the tracking center, so we use a negative distance. If it was to the right of the
          * // tracking center, we would use a positive distance
-         * gen::TrackingWheel verticalTrackingWheel(&verticalEncoder, gen::Omniwheel::NEW_275, -5);
+         * arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, arc::Omniwheel::NEW_275, -5);
          * // create a new optical shaft encoder on ports `C` and `D`
          * // this sensor is not reversed
          * pros::adi::Encoder horizontalEncoder('C', 'D', false);
@@ -56,7 +56,7 @@ class TrackingWheel {
          * // of the tracking center, so we use a negative distance. If it was to the front of the
          * // tracking center, we would use a positive distance
          * // this wheel also has a 5:3 gear ratio
-         * gen::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, gen::Omniwheel::OLD_325, -2, 5.0/3.0);
+         * arc::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, arc::Omniwheel::OLD_325, -2, 5.0/3.0);
          * @endcode
          */
         TrackingWheel(pros::adi::Encoder* encoder, float wheelDiameter, float distance, float gearRatio = 1);
@@ -78,7 +78,7 @@ class TrackingWheel {
          * // it's also 5 inches away from the tracking center. This tracking wheel is to the left
          * // of the tracking center, so we use a negative distance. If it was to the right of the
          * // tracking center, we would use a positive distance
-         * gen::TrackingWheel verticalTrackingWheel(&verticalEncoder, gen::Omniwheel::NEW_275, -5);
+         * arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, arc::Omniwheel::NEW_275, -5);
          * // create a new rotation sensor on port 2
          * // this sensor is reversed
          * pros::Rotation horizontalEncoder(2, true);
@@ -88,7 +88,7 @@ class TrackingWheel {
          * // of the tracking center, so we use a negative distance. If it was to the front of the
          * // tracking center, we would use a positive distance
          * // this wheel also has a 5:3 gear ratio
-         * gen::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, gen::Omniwheel::OLD_325, -2, 5.0/3.0);
+         * arc::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, arc::Omniwheel::OLD_325, -2, 5.0/3.0);
          * @endcode
          */
         TrackingWheel(pros::Rotation* encoder, float wheelDiameter, float distance, float gearRatio = 1);
@@ -115,7 +115,7 @@ class TrackingWheel {
          * // distance is also negative because the left drive side is to the left of the tracking center
          * // if it was to the right of the tracking center, we would use a positive distance
          * // the rpm is 360
-         * gen::TrackingWheel leftTrackingWheel(&leftMotors, gen::Omniwheel::OLD_4, -5, 360);
+         * arc::TrackingWheel leftTrackingWheel(&leftMotors, arc::Omniwheel::OLD_4, -5, 360);
          * @endcode
          */
         TrackingWheel(pros::MotorGroup* motors, float wheelDiameter, float distance, float rpm);
@@ -160,7 +160,7 @@ class TrackingWheel {
          * @code {.cpp}
          * void initialize() {
          *     // create a tracking wheel with an offset of 0.5 inches
-         *     gen::TrackingWheel exampleTrackingWheel(&exampleEncoder, gen::Omniwheel::NEW_275, 0.5);
+         *     arc::TrackingWheel exampleTrackingWheel(&exampleEncoder, arc::Omniwheel::NEW_275, 0.5);
          *     // this prints 0.5 to the terminal, the offset of the tracking wheel
          *     std::cout << "offset: " << exampleTrackingWheel.getOffset() << std::endl;
          * }
@@ -176,7 +176,7 @@ class TrackingWheel {
          * @code {.cpp}
          * void initialize() {
          *     // create a tracking wheel that uses a rotation sensor
-         *     gen::TrackingWheel exampleTrackingWheel(&exampleRotationSensor, gen::Omniwheel::NEW_275, 0.5);
+         *     arc::TrackingWheel exampleTrackingWheel(&exampleRotationSensor, arc::Omniwheel::NEW_275, 0.5);
          *     // this prints 0 to the terminal, because it uses a rotation sensor. If it used a motor group, it would
          *     // have returned 1
          *     std::cout << "type: " << exampleTrackingWheel.getType() << std::endl;
@@ -193,4 +193,4 @@ class TrackingWheel {
         pros::MotorGroup* motors = nullptr;
         float gearRatio = 1;
 };
-} // namespace gen
+} // namespace arc

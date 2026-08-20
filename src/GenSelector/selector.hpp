@@ -38,7 +38,7 @@ struct SelectorInputConfig {
 };
 
 struct SelectorMenuConfig {
-    std::string teamNumber = "0000A";
+    std::string teamNumber = "14683A";
 };
 
 struct SelectorTemperatureSource {

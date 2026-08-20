@@ -1,3 +1,9 @@
+// GenSelector - the LVGL autonomous selector UI.
+//
+// Originally written by team 78181A Genesis; the on-screen branding below has
+// been changed to 14683A for our robot.  The credit lived only in that subtitle
+// label, so it is recorded here instead of being lost.
+
 #include "selector.hpp"
 
 #include <algorithm>
@@ -269,13 +275,16 @@ void AutonSelector::buildUi() {
     lv_obj_set_pos(titleDivider, 258, kTopRowY - 1);
 
     ui_.titleLabel = lv_label_create(screen);
-    lv_label_set_text(ui_.titleLabel, "Gen-Selector");
+    // Keep this to ~12 characters: montserrat_30 starting at x=272 on a 480 px
+    // brain screen runs out of room past that.
+    lv_label_set_text(ui_.titleLabel, "Override");
     lv_obj_set_style_text_color(ui_.titleLabel, lv_color_hex(0x6ec0ff), LV_PART_MAIN);
     lv_obj_set_style_text_font(ui_.titleLabel, &lv_font_montserrat_30, LV_PART_MAIN);
     lv_obj_set_pos(ui_.titleLabel, 272, kTopRowY);
 
     ui_.subtitleLabel = lv_label_create(screen);
-    lv_label_set_text(ui_.subtitleLabel, "Created by 78181A Genesis");
+    // ~25 characters fits at montserrat_12 from x=305.
+    lv_label_set_text(ui_.subtitleLabel, "14683A - V5RC 2026-27");
     lv_obj_set_style_text_color(ui_.subtitleLabel, lv_color_hex(0x8ab9e2), LV_PART_MAIN);
     lv_obj_set_style_text_font(ui_.subtitleLabel, &lv_font_montserrat_12, LV_PART_MAIN);
     lv_obj_set_pos(ui_.subtitleLabel, 305, kTopRowY + 35);

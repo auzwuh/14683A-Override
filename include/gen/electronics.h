@@ -16,7 +16,7 @@
 #include "pros/motor_group.hpp"
 #include "pros/motors.hpp"
 
-namespace gen {
+namespace arc {
 
 class CustomIMU : public pros::IMU {
   public:
@@ -322,4 +322,4 @@ class Controller {
   double curve_amount_;
   bool drive_curves_;
 };
-}  // namespace gen
+}  // namespace arc

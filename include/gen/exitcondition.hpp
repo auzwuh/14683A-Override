@@ -5,7 +5,7 @@
 
 #include "gen/pose.hpp"
 
-namespace gen {
+namespace arc {
 
 class ExitCondition {
     public:
@@ -43,4 +43,4 @@ class Settler {
         std::function<bool()> condition;
 };
 
-} // namespace gen
+} // namespace arc

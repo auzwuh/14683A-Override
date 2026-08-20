@@ -6,7 +6,7 @@
 #include "gen/chassis/chassis.hpp"
 #include "gen/chassis/trackingWheel.hpp" // IWYU pragma: keep
 
-// using to shorten gen::AngularDirection to just AngularDirection
-using gen::AngularDirection;
-// using to shorten gen::LockedSide to just LockedSide
-using gen::LockedSide;
+// using to shorten arc::AngularDirection to just AngularDirection
+using arc::AngularDirection;
+// using to shorten arc::LockedSide to just LockedSide
+using arc::LockedSide;

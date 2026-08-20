@@ -1,6 +1,6 @@
 #pragma once
 
-namespace gen {
+namespace arc {
 
 struct AsymptoticGains {
     float initial = 0.0f;
@@ -51,4 +51,4 @@ class PID {
         float filteredDerivative = 0.0f;
 };
 
-} // namespace gen
+} // namespace arc

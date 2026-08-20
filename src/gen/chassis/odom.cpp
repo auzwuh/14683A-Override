@@ -14,11 +14,11 @@
 pros::Task* trackingTask = nullptr;
 
 // global variables
-gen::OdomSensors odomSensors(nullptr, nullptr, nullptr, nullptr, nullptr); // the sensors to be used for odometry
-gen::Drivetrain drive(nullptr, nullptr, 0, 0, 0, 0); // the drivetrain to be used for odometry
-gen::Pose odomPose(0, 0, 0); // the pose of the robot
-gen::Pose odomSpeed(0, 0, 0); // the speed of the robot
-gen::Pose odomLocalSpeed(0, 0, 0); // the local speed of the robot
+arc::OdomSensors odomSensors(nullptr, nullptr, nullptr, nullptr, nullptr); // the sensors to be used for odometry
+arc::Drivetrain drive(nullptr, nullptr, 0, 0, 0, 0); // the drivetrain to be used for odometry
+arc::Pose odomPose(0, 0, 0); // the pose of the robot
+arc::Pose odomSpeed(0, 0, 0); // the speed of the robot
+arc::Pose odomLocalSpeed(0, 0, 0); // the local speed of the robot
 
 float prevVertical = 0;
 float prevVertical1 = 0;
@@ -28,32 +28,32 @@ float prevHorizontal1 = 0;
 float prevHorizontal2 = 0;
 float prevImu = 0;
 
-void gen::setSensors(gen::OdomSensors sensors, gen::Drivetrain drivetrain) {
+void arc::setSensors(arc::OdomSensors sensors, arc::Drivetrain drivetrain) {
     odomSensors = sensors;
     drive = drivetrain;
 }
 
-gen::Pose gen::getPose(bool radians) {
+arc::Pose arc::getPose(bool radians) {
     if (radians) return odomPose;
-    else return gen::Pose(odomPose.x, odomPose.y, radToDeg(odomPose.theta));
+    else return arc::Pose(odomPose.x, odomPose.y, radToDeg(odomPose.theta));
 }
 
-void gen::setPose(gen::Pose pose, bool radians) {
+void arc::setPose(arc::Pose pose, bool radians) {
     if (radians) odomPose = pose;
-    else odomPose = gen::Pose(pose.x, pose.y, degToRad(pose.theta));
+    else odomPose = arc::Pose(pose.x, pose.y, degToRad(pose.theta));
 }
 
-gen::Pose gen::getSpeed(bool radians) {
+arc::Pose arc::getSpeed(bool radians) {
     if (radians) return odomSpeed;
-    else return gen::Pose(odomSpeed.x, odomSpeed.y, radToDeg(odomSpeed.theta));
+    else return arc::Pose(odomSpeed.x, odomSpeed.y, radToDeg(odomSpeed.theta));
 }
 
-gen::Pose gen::getLocalSpeed(bool radians) {
+arc::Pose arc::getLocalSpeed(bool radians) {
     if (radians) return odomLocalSpeed;
-    else return gen::Pose(odomLocalSpeed.x, odomLocalSpeed.y, radToDeg(odomLocalSpeed.theta));
+    else return arc::Pose(odomLocalSpeed.x, odomLocalSpeed.y, radToDeg(odomLocalSpeed.theta));
 }
 
-gen::Pose gen::estimatePose(float time, bool radians) {
+arc::Pose arc::estimatePose(float time, bool radians) {
     // get current position and speed
     Pose curPose = getPose(true);
     Pose localSpeed = getLocalSpeed(true);
@@ -72,7 +72,7 @@ gen::Pose gen::estimatePose(float time, bool radians) {
     return futurePose;
 }
 
-void gen::update() {
+void arc::update() {
     // TODO: add particle filter
     // get the current sensor values
     float vertical1Raw = 0;
@@ -126,8 +126,8 @@ void gen::update() {
 
     // choose tracking wheels to use
     // Prioritize non-powered tracking wheels
-    gen::TrackingWheel* verticalWheel = nullptr;
-    gen::TrackingWheel* horizontalWheel = nullptr;
+    arc::TrackingWheel* verticalWheel = nullptr;
+    arc::TrackingWheel* horizontalWheel = nullptr;
     if (!odomSensors.vertical1->getType()) verticalWheel = odomSensors.vertical1;
     else if (!odomSensors.vertical2->getType()) verticalWheel = odomSensors.vertical2;
     else verticalWheel = odomSensors.vertical1;
@@ -162,7 +162,7 @@ void gen::update() {
     }
 
     // save previous pose
-    gen::Pose prevPose = odomPose;
+    arc::Pose prevPose = odomPose;
 
     // calculate global x and y
     odomPose.x += localY * sin(avgHeading);
@@ -182,7 +182,7 @@ void gen::update() {
     odomLocalSpeed.theta = ema(deltaHeading / 0.01, odomLocalSpeed.theta, 0.95);
 }
 
-void gen::init() {
+void arc::init() {
     if (trackingTask == nullptr) {
         trackingTask = new pros::Task {[=] {
             while (true) {

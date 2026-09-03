@@ -3,10 +3,13 @@
 #include "macros.hpp"
 #include "GenSelector/selector.hpp"
 #include "gen/asset.hpp"
+#include "gen/chassis/odom.hpp"
 #include "gen/electronics.h"
 #include "gen/setup.hpp"
 #include "pros/distance.hpp"
 
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 
@@ -114,6 +117,7 @@ namespace Auton {
 void boomerangTest();
 void ramseteLqrPathTest();
 void ramseteLqrTestRoutine();
+void ramseteLqrTauTest();
 void pidTest();
 void doNothing() {}
 
@@ -127,6 +131,7 @@ robot::AutonRoutineList autonRoutines = {
     {"Blue - Top", static_cast<robot::AutonFunc>(Auton::overrideBlueTop)},
     {"Boomerang Test", static_cast<robot::AutonFunc>(Auton::boomerangTest)},
     {"RAMSETE-LQR Test Routine", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
+    {"RAMSETE-LQR Tau Step Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTauTest)},
     {"PID Test", static_cast<robot::AutonFunc>(Auton::pidTest)},
     {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
 };
@@ -349,6 +354,41 @@ void Auton::boomerangTest() {
 
     //  chassis.turnToHeading(0, {.timeout = 1500, .velocityExit = 3, .errorExit = 4, .lockedSide = arc::LockedSide::RIGHT});
 
+}
+
+// Open-loop velocity step response, straight line only. Drives at a fixed
+// duty cycle and logs (t_ms, in_per_sec) to the SD card so the drivetrain's
+// true first-order velocity time constant can be fit from real data instead
+// of assumed - see RamseteLQRParams::velocityTimeConstant and
+// docs/path_following_notebook.md (RAMSETE + LQR section) for what this
+// number feeds into and why 0.10s was only ever a placeholder.
+//
+// Reading the result: tau is the time from the step starting to the
+// velocity first crossing 63.2% of its steady-state (settled) value. Pick
+// the settled value from the last ~20 rows of the CSV (avg them - there
+// will be some V5 sensor noise), find 0.632 * that, and read off the
+// matching t_ms.
+void Auton::ramseteLqrTauTest() {
+    constexpr float kStepDuty = 80.0f;   // out of 127, matches typical RAMSETE-LQR maxSpeed
+    constexpr int kDurationMs = 1500;    // long enough to settle at kStepDuty on this drivetrain
+    constexpr int kSampleMs = 10;
+
+    chassis.setPose(0, 0, 0);
+    FILE* log = std::fopen("/usd/ramsete_tau_step.csv", "w");
+    if (log != nullptr) std::fprintf(log, "t_ms,in_per_sec\n");
+
+    const std::uint32_t start = pros::millis();
+    std::uint32_t t = 0;
+    while (t <= static_cast<std::uint32_t>(kDurationMs)) {
+        chassis.tank(static_cast<int>(kStepDuty), static_cast<int>(kStepDuty));
+        const arc::Pose velocity = arc::getSpeed(false);
+        const float speed = std::hypot(velocity.x, velocity.y);
+        if (log != nullptr) std::fprintf(log, "%lu,%.4f\n", static_cast<unsigned long>(t), speed);
+        pros::delay(kSampleMs);
+        t = pros::millis() - start;
+    }
+    chassis.tank(0, 0);
+    if (log != nullptr) std::fclose(log);
 }
 
 void Auton::ramseteLqrTestRoutine() {

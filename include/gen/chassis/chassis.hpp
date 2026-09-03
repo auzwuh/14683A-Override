@@ -185,6 +185,21 @@ struct RamseteLQRParams {
     float maxSpeed = 127.0f;
     float b = 0.00129032f;
     float zeta = 0.7f;
+    // Drivetrain velocity-lag time constant the inner LQR stage is built
+    // around (arc::path::RamseteLQRConfig::velocityTimeConstant). This is a
+    // physical property of the real robot (motors, gearing, battery sag),
+    // not a math constant like b/zeta - measure it per-robot with a
+    // velocity step-response test rather than trusting the 0.10s default.
+    // See docs/path_following_notebook.md, RAMSETE + LQR section.
+    float velocityTimeConstant = 0.10f;
+    // Inverse-square LQR tolerances (arc::path::RamseteLQRConfig) - "how
+    // much error/overcommand in this axis do I actually care about", same
+    // convention as CostWeights. See tests/tune_ramsete_lqr.cpp for a
+    // simulated search over all seven of these together.
+    float linearVelocityTolerance = 2.0f;
+    float angularVelocityTolerance = 0.5f;
+    float linearCommandTolerance = 12.0f;
+    float angularCommandTolerance = 3.0f;
     bool async = false;
 };
 

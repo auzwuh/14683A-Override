@@ -1057,6 +1057,11 @@ void followRamseteLQR(Chassis& chassis, const asset& pathAsset, RamseteLQRParams
     arc::path::RamseteLQRConfig config;
     config.b = params.b;
     config.zeta = params.zeta;
+    config.velocityTimeConstant = params.velocityTimeConstant;
+    config.linearVelocityTolerance = params.linearVelocityTolerance;
+    config.angularVelocityTolerance = params.angularVelocityTolerance;
+    config.linearCommandTolerance = params.linearCommandTolerance;
+    config.angularCommandTolerance = params.angularCommandTolerance;
     config.limits = limits;
     arc::path::RamseteLQRController controller(config);
 

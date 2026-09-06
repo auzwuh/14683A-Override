@@ -8,6 +8,7 @@
 
 #include "gen/chassis/chassis.hpp"
 #include "gen/chassis/odom.hpp"
+#include "gen/features.hpp"
 #include "gen/path_following/ramsete_lqr.hpp"
 #include "gen/util.hpp"
 #include "pros/rtos.hpp"
@@ -1022,6 +1023,12 @@ void Chassis::followAPS(const asset& pathAsset, APSParams params) {
 // requestMotionStart()/endMotion(), distTraveled, headingTarget) and
 // drivetrain/lateralSettings every other motion in this file uses.
 // Chassis::followRamseteLQR() below just forwards here.
+#if !ARC_RAMSETE_LQR_ENABLED
+// Disabled per include/gen/features.hpp - every caller (Chassis, autons,
+// opcontrol) gets a harmless no-op instead of running pose feedback blind
+// on a robot with no/unreliable odometry. Nothing else needs to change.
+void followRamseteLQR(Chassis&, const asset&, RamseteLQRParams) {}
+#else
 void followRamseteLQR(Chassis& chassis, const asset& pathAsset, RamseteLQRParams params) {
     applyExitDefaults(params, chassis.lateralSettings.exits);
     if (params.async) {
@@ -1156,6 +1163,7 @@ void followRamseteLQR(Chassis& chassis, const asset& pathAsset, RamseteLQRParams
     chassis.distTraveled = -1.0f;
     chassis.endMotion();
 }
+#endif // ARC_RAMSETE_LQR_ENABLED
 
 void Chassis::followRamseteLQR(const asset& path, RamseteLQRParams params) {
     arc::followRamseteLQR(*this, path, params);

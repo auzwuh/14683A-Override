@@ -5,6 +5,7 @@
 #include "gen/asset.hpp"
 #include "gen/chassis/odom.hpp"
 #include "gen/electronics.h"
+#include "gen/features.hpp"
 #include "gen/setup.hpp"
 #include "pros/distance.hpp"
 
@@ -27,22 +28,22 @@ arc::MotorGroup leftDrive({18, 17}, 600.0, 1.33);
 arc::MotorGroup rightDrive({20, 19}, 600.0, 1.33);
 arc::MotorGroup intake({12}, 600.0, 1.0);
 
-arc::MotorGroup lift({2, 3}, 600.0, 1.0);     // cascade lift
-arc::MotorGroup claw({4}, 600.0, 1.0);        // claw grip
-arc::MotorGroup clawRot({5}, 600.0, 1.0);     // claw rotation for stacking
+arc::MotorGroup lift({2, 3}, 200.0, 1.0);     // cascade lift
+arc::MotorGroup claw({4}, 200.0, 0.25);      
+arc::MotorGroup clawRot({5}, 200.0, 0.25);    
 pros::Rotation horizontalEncoder(-15);
 pros::Rotation verticalEncoder(-16);
 arc::CustomIMU imu(1, 1.01123595506);
 
 
-arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);
-arc::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, 2.0, -2.469176);
+// arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);
+// arc::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, 2.0, -2.469176);
 
 // arc::Piston wingPiston('A', false, "wing");
 // arc::PistonGroup wings({{"wing", &wingPiston}});
 
 constexpr arc::Motion::DrivetrainProfile drivetrainProfile{
-    .trackWidthIn = 10.6f,
+    .trackWidthIn = 11.0f,
     .wheelDiameterIn = arc::Omniwheel::NEW_275,
     .wheelRpm = 450.0f,
     .horizontalDrift = 8.0f,
@@ -90,7 +91,7 @@ constexpr arc::Motion::ControllerProfile angularProfile{
 };
 
 constexpr arc::Motion::OdomProfile odomProfile{
-    .vertical1 = &verticalTrackingWheel,
+    .vertical1 = nullptr,
     .vertical2 = nullptr,
     .horizontal1 = nullptr,
     .horizontal2 = nullptr,
@@ -130,8 +131,10 @@ robot::AutonRoutineList autonRoutines = {
     {"Blue - Right", static_cast<robot::AutonFunc>(Auton::overrideBlueRight)},
     {"Blue - Top", static_cast<robot::AutonFunc>(Auton::overrideBlueTop)},
     {"Boomerang Test", static_cast<robot::AutonFunc>(Auton::boomerangTest)},
+#if ARC_RAMSETE_LQR_ENABLED
     {"RAMSETE-LQR Test Routine", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
     {"RAMSETE-LQR Tau Step Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTauTest)},
+#endif
     {"PID Test", static_cast<robot::AutonFunc>(Auton::pidTest)},
     {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
 };
@@ -356,21 +359,11 @@ void Auton::boomerangTest() {
 
 }
 
-// Open-loop velocity step response, straight line only. Drives at a fixed
-// duty cycle and logs (t_ms, in_per_sec) to the SD card so the drivetrain's
-// true first-order velocity time constant can be fit from real data instead
-// of assumed - see RamseteLQRParams::velocityTimeConstant and
-// docs/path_following_notebook.md (RAMSETE + LQR section) for what this
-// number feeds into and why 0.10s was only ever a placeholder.
-//
-// Reading the result: tau is the time from the step starting to the
-// velocity first crossing 63.2% of its steady-state (settled) value. Pick
-// the settled value from the last ~20 rows of the CSV (avg them - there
-// will be some V5 sensor noise), find 0.632 * that, and read off the
-// matching t_ms.
+#if ARC_RAMSETE_LQR_ENABLED
+
 void Auton::ramseteLqrTauTest() {
-    constexpr float kStepDuty = 80.0f;   // out of 127, matches typical RAMSETE-LQR maxSpeed
-    constexpr int kDurationMs = 1500;    // long enough to settle at kStepDuty on this drivetrain
+    constexpr float kStepDuty = 80.0f;
+    constexpr int kDurationMs = 1500; 
     constexpr int kSampleMs = 10;
 
     chassis.setPose(0, 0, 0);
@@ -417,6 +410,7 @@ void Auton::ramseteLqrTestRoutine() {
         .maxSpeed = 100,
     });
 }
+#endif // ARC_RAMSETE_LQR_ENABLED
 
 void Auton::pidTest() {
     chassis.setPose(0, 0, 0);
@@ -441,7 +435,9 @@ void autonomous() {
 }
 
 void opcontrol() {
+#if ARC_RAMSETE_LQR_ENABLED
     Auton::ramseteLqrTestRoutine(); //test ramsete lqr path following
+#endif
     while (true) {
         const auto [leftOutput, rightOutput] = controller.arcade_two_stick();
         chassis.tank(leftOutput, rightOutput);

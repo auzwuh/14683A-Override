@@ -1,9 +1,25 @@
 #pragma once
 
+#include <cstdint>
 #include "gen/chassis/chassis.hpp"
 #include "gen/pose.hpp"
 
 namespace arc {
+/** Coherent inches/clockwise-compass-radians state. Signed body velocities are
+ * inches/sec (forward, left positive), angular velocity clockwise rad/sec.
+ * Valid requires unpowered pods on both axes, IMU and a measured interval.
+ * First samples, resets and sensor faults publish valid=false.
+ */
+struct OdomSnapshot {
+    Pose pose{0, 0, 0};
+    float forwardVelocity = 0;
+    float leftVelocity = 0;
+    float clockwiseAngularVelocity = 0;
+    std::uint32_t timestampMs = 0;
+    float dtSeconds = 0;
+    bool valid = false;
+};
+OdomSnapshot getOdomSnapshot();
 /**
  * @brief Set the sensors to be used for odometry
  *

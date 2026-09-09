@@ -1,187 +1,182 @@
-// The implementation below is mostly based off of
-// the document written by 5225A (Pilons)
-// Here is a link to the original document
-// http://thepilons.ca/wp-content/uploads/2018/10/Tracking.pdf
-
-#include <math.h>
+// Midpoint/chord odometry follows the Pilons tracking-wheel construction.
+#include <cmath>
+#include <cerrno>
+#include <mutex>
 #include "pros/rtos.hpp"
 #include "gen/util.hpp"
 #include "gen/chassis/odom.hpp"
-#include "gen/chassis/chassis.hpp"
 #include "gen/chassis/trackingWheel.hpp"
+#include "gen/damp/measurement.hpp"
 
-// tracking thread
+namespace {
 pros::Task* trackingTask = nullptr;
-
-// global variables
-arc::OdomSensors odomSensors(nullptr, nullptr, nullptr, nullptr, nullptr); // the sensors to be used for odometry
-arc::Drivetrain drive(nullptr, nullptr, 0, 0, 0, 0); // the drivetrain to be used for odometry
-arc::Pose odomPose(0, 0, 0); // the pose of the robot
-arc::Pose odomSpeed(0, 0, 0); // the speed of the robot
-arc::Pose odomLocalSpeed(0, 0, 0); // the local speed of the robot
-
-float prevVertical = 0;
-float prevVertical1 = 0;
-float prevVertical2 = 0;
-float prevHorizontal = 0;
-float prevHorizontal1 = 0;
-float prevHorizontal2 = 0;
-float prevImu = 0;
-
-void arc::setSensors(arc::OdomSensors sensors, arc::Drivetrain drivetrain) {
-    odomSensors = sensors;
-    drive = drivetrain;
+pros::Mutex odomMutex;
+arc::OdomSensors odomSensors(nullptr, nullptr, nullptr, nullptr, nullptr);
+arc::Pose odomPose(0, 0, 0), odomSpeed(0, 0, 0), odomLocalSpeed(0, 0, 0);
+arc::OdomSnapshot snapshot;
+arc::damp::measurement::Tracker measurement;
+struct Readings {
+    double v1 = 0, v2 = 0, h1 = 0, h2 = 0, imu = 0;
+    std::uint32_t time = 0;
+    bool valid = true;
+};
+Readings previous;
+bool initialized = false;
+bool unpowered(arc::TrackingWheel* wheel) { return wheel && wheel->getType() == 0; }
+double readWheel(arc::TrackingWheel* wheel, bool& valid) {
+    if (!wheel) return 0;
+    // Integer PROS_ERR is converted to inches inside TrackingWheel. Check errno
+    // at the call boundary, before another device can overwrite the error.
+    errno = 0;
+    const double distance = wheel->getDistanceTraveled();
+    valid = valid && errno == 0 && std::isfinite(distance) && std::isfinite(wheel->getOffset());
+    return distance;
 }
-
-arc::Pose arc::getPose(bool radians) {
-    if (radians) return odomPose;
-    else return arc::Pose(odomPose.x, odomPose.y, radToDeg(odomPose.theta));
-}
-
-void arc::setPose(arc::Pose pose, bool radians) {
-    if (radians) odomPose = pose;
-    else odomPose = arc::Pose(pose.x, pose.y, degToRad(pose.theta));
-}
-
-arc::Pose arc::getSpeed(bool radians) {
-    if (radians) return odomSpeed;
-    else return arc::Pose(odomSpeed.x, odomSpeed.y, radToDeg(odomSpeed.theta));
-}
-
-arc::Pose arc::getLocalSpeed(bool radians) {
-    if (radians) return odomLocalSpeed;
-    else return arc::Pose(odomLocalSpeed.x, odomLocalSpeed.y, radToDeg(odomLocalSpeed.theta));
-}
-
-arc::Pose arc::estimatePose(float time, bool radians) {
-    // get current position and speed
-    Pose curPose = getPose(true);
-    Pose localSpeed = getLocalSpeed(true);
-    // calculate the change in local position
-    Pose deltaLocalPose = localSpeed * time;
-
-    // calculate the future pose
-    float avgHeading = curPose.theta + deltaLocalPose.theta / 2;
-    Pose futurePose = curPose;
-    futurePose.x += deltaLocalPose.y * sin(avgHeading);
-    futurePose.y += deltaLocalPose.y * cos(avgHeading);
-    futurePose.x += deltaLocalPose.x * -cos(avgHeading);
-    futurePose.y += deltaLocalPose.x * sin(avgHeading);
-    if (!radians) futurePose.theta = radToDeg(futurePose.theta);
-
-    return futurePose;
-}
-
-void arc::update() {
-    // TODO: add particle filter
-    // get the current sensor values
-    float vertical1Raw = 0;
-    float vertical2Raw = 0;
-    float horizontal1Raw = 0;
-    float horizontal2Raw = 0;
-    float imuRaw = 0;
-    if (odomSensors.vertical1 != nullptr) vertical1Raw = odomSensors.vertical1->getDistanceTraveled();
-    if (odomSensors.vertical2 != nullptr) vertical2Raw = odomSensors.vertical2->getDistanceTraveled();
-    if (odomSensors.horizontal1 != nullptr) horizontal1Raw = odomSensors.horizontal1->getDistanceTraveled();
-    if (odomSensors.horizontal2 != nullptr) horizontal2Raw = odomSensors.horizontal2->getDistanceTraveled();
-    if (odomSensors.imu != nullptr) imuRaw = degToRad(odomSensors.imu->get_rotation());
-
-    // calculate the change in sensor values
-    float deltaVertical1 = vertical1Raw - prevVertical1;
-    float deltaVertical2 = vertical2Raw - prevVertical2;
-    float deltaHorizontal1 = horizontal1Raw - prevHorizontal1;
-    float deltaHorizontal2 = horizontal2Raw - prevHorizontal2;
-    float deltaImu = imuRaw - prevImu;
-
-    // update the previous sensor values
-    prevVertical1 = vertical1Raw;
-    prevVertical2 = vertical2Raw;
-    prevHorizontal1 = horizontal1Raw;
-    prevHorizontal2 = horizontal2Raw;
-    prevImu = imuRaw;
-
-    // calculate the heading of the robot
-    // Priority:
-    // 1. Horizontal tracking wheels
-    // 2. Vertical tracking wheels
-    // 3. Inertial Sensor
-    // 4. Drivetrain
-    float heading = odomPose.theta;
-    // calculate the heading using the horizontal tracking wheels
-    if (odomSensors.horizontal1 != nullptr && odomSensors.horizontal2 != nullptr)
-        heading -= (deltaHorizontal1 - deltaHorizontal2) /
-                   (odomSensors.horizontal1->getOffset() - odomSensors.horizontal2->getOffset());
-    // else, if both vertical tracking wheels aren't substituted by the drivetrain, use the vertical tracking wheels
-    else if (!odomSensors.vertical1->getType() && !odomSensors.vertical2->getType())
-        heading -= (deltaVertical1 - deltaVertical2) /
-                   (odomSensors.vertical1->getOffset() - odomSensors.vertical2->getOffset());
-    // else, if the inertial sensor exists, use it
-    else if (odomSensors.imu != nullptr) heading += deltaImu;
-    // else, use the the substituted tracking wheels
-    else
-        heading -= (deltaVertical1 - deltaVertical2) /
-                   (odomSensors.vertical1->getOffset() - odomSensors.vertical2->getOffset());
-    float deltaHeading = heading - odomPose.theta;
-    float avgHeading = odomPose.theta + deltaHeading / 2;
-
-    // choose tracking wheels to use
-    // Prioritize non-powered tracking wheels
-    arc::TrackingWheel* verticalWheel = nullptr;
-    arc::TrackingWheel* horizontalWheel = nullptr;
-    if (!odomSensors.vertical1->getType()) verticalWheel = odomSensors.vertical1;
-    else if (!odomSensors.vertical2->getType()) verticalWheel = odomSensors.vertical2;
-    else verticalWheel = odomSensors.vertical1;
-    if (odomSensors.horizontal1 != nullptr) horizontalWheel = odomSensors.horizontal1;
-    else if (odomSensors.horizontal2 != nullptr) horizontalWheel = odomSensors.horizontal2;
-    float rawVertical = 0;
-    float rawHorizontal = 0;
-    if (verticalWheel != nullptr) rawVertical = verticalWheel->getDistanceTraveled();
-    if (horizontalWheel != nullptr) rawHorizontal = horizontalWheel->getDistanceTraveled();
-    float horizontalOffset = 0;
-    float verticalOffset = 0;
-    if (verticalWheel != nullptr) verticalOffset = verticalWheel->getOffset();
-    if (horizontalWheel != nullptr) horizontalOffset = horizontalWheel->getOffset();
-
-    // calculate change in x and y
-    float deltaX = 0;
-    float deltaY = 0;
-    if (verticalWheel != nullptr) deltaY = rawVertical - prevVertical;
-    if (horizontalWheel != nullptr) deltaX = rawHorizontal - prevHorizontal;
-    prevVertical = rawVertical;
-    prevHorizontal = rawHorizontal;
-
-    // calculate local x and y
-    float localX = 0;
-    float localY = 0;
-    if (deltaHeading == 0) { // prevent divide by 0
-        localX = deltaX;
-        localY = deltaY;
-    } else {
-        localX = 2 * sin(deltaHeading / 2) * (deltaX / deltaHeading + horizontalOffset);
-        localY = 2 * sin(deltaHeading / 2) * (deltaY / deltaHeading + verticalOffset);
+Readings readSensors() {
+    Readings result;
+    result.v1 = readWheel(odomSensors.vertical1, result.valid);
+    result.v2 = readWheel(odomSensors.vertical2, result.valid);
+    result.h1 = readWheel(odomSensors.horizontal1, result.valid);
+    result.h2 = readWheel(odomSensors.horizontal2, result.valid);
+    if (odomSensors.imu) {
+        errno = 0;
+        const double rotation = odomSensors.imu->get_rotation();
+        // PROS_ERR_F is infinity; isfinite also rejects NaN.
+        const bool rotationValid = errno == 0 && std::isfinite(rotation);
+        errno = 0;
+        const bool calibrating = odomSensors.imu->is_calibrating();
+        result.valid = result.valid && rotationValid && errno == 0 && !calibrating;
+        result.imu = rotation * 3.14159265358979323846 / 180;
     }
-
-    // save previous pose
-    arc::Pose prevPose = odomPose;
-
-    // calculate global x and y
-    odomPose.x += localY * sin(avgHeading);
-    odomPose.y += localY * cos(avgHeading);
-    odomPose.x += localX * -cos(avgHeading);
-    odomPose.y += localX * sin(avgHeading);
-    odomPose.theta = heading;
-
-    // calculate speed
-    odomSpeed.x = ema((odomPose.x - prevPose.x) / 0.01, odomSpeed.x, 0.95);
-    odomSpeed.y = ema((odomPose.y - prevPose.y) / 0.01, odomSpeed.y, 0.95);
-    odomSpeed.theta = ema((odomPose.theta - prevPose.theta) / 0.01, odomSpeed.theta, 0.95);
-
-    // calculate local speed
-    odomLocalSpeed.x = ema(localX / 0.01, odomLocalSpeed.x, 0.95);
-    odomLocalSpeed.y = ema(localY / 0.01, odomLocalSpeed.y, 0.95);
-    odomLocalSpeed.theta = ema(deltaHeading / 0.01, odomLocalSpeed.theta, 0.95);
+    result.time = pros::millis();
+    return result;
 }
-
+void invalidate(std::uint32_t time) {
+    snapshot = {};
+    snapshot.pose = odomPose;
+    snapshot.timestampMs = time;
+    odomSpeed = arc::Pose(0, 0, 0);
+    odomLocalSpeed = arc::Pose(0, 0, 0);
+    measurement.reset();
+    initialized = false;
+}
+arc::Pose inUnits(arc::Pose pose, bool radians) {
+    if (!radians) pose.theta = arc::radToDeg(pose.theta);
+    return pose;
+}
+}
+void arc::setSensors(arc::OdomSensors sensors, arc::Drivetrain drivetrain) {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    (void)drivetrain;
+    odomSensors = sensors;
+    invalidate(pros::millis());
+}
+arc::Pose arc::getPose(bool radians) {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    return inUnits(odomPose, radians);
+}
+arc::OdomSnapshot arc::getOdomSnapshot() {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    return snapshot;
+}
+void arc::setPose(arc::Pose pose, bool radians) {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    if (!radians) pose.theta = degToRad(pose.theta);
+    odomPose = pose;
+    invalidate(pros::millis());
+}
+arc::Pose arc::getSpeed(bool radians) {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    return inUnits(odomSpeed, radians);
+}
+arc::Pose arc::getLocalSpeed(bool radians) {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    return inUnits(odomLocalSpeed, radians);
+}
+arc::Pose arc::estimatePose(float time, bool radians) {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    const Pose delta = odomLocalSpeed * time;
+    const float midpoint = odomPose.theta + delta.theta / 2;
+    Pose future = odomPose;
+    future.x += delta.y * std::sin(midpoint) - delta.x * std::cos(midpoint);
+    future.y += delta.y * std::cos(midpoint) + delta.x * std::sin(midpoint);
+    return inUnits(future, radians);
+}
+void arc::update() {
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    const Readings current = readSensors();
+    if (!current.valid || !std::isfinite(odomPose.x) || !std::isfinite(odomPose.y) ||
+        !std::isfinite(odomPose.theta)) {
+        invalidate(current.time);
+        return;
+    }
+    auto* vertical = unpowered(odomSensors.vertical1) ? odomSensors.vertical1 :
+                     unpowered(odomSensors.vertical2) ? odomSensors.vertical2 :
+                     odomSensors.vertical1 ? odomSensors.vertical1 : odomSensors.vertical2;
+    auto* horizontal = unpowered(odomSensors.horizontal1) ? odomSensors.horizontal1 :
+                       unpowered(odomSensors.horizontal2) ? odomSensors.horizontal2 :
+                       odomSensors.horizontal1 ? odomSensors.horizontal1 : odomSensors.horizontal2;
+    const double v = vertical == odomSensors.vertical1 ? current.v1 : current.v2;
+    const double h = horizontal == odomSensors.horizontal1 ? current.h1 : current.h2;
+    const double vo = vertical ? vertical->getOffset() : 0;
+    const double ho = horizontal ? horizontal->getOffset() : 0;
+    const auto raw = measurement.update({v, h, current.imu, current.time,
+                                         unpowered(vertical) && unpowered(horizontal) && odomSensors.imu}, vo, ho);
+    snapshot = {};
+    snapshot.pose = odomPose;
+    snapshot.timestampMs = current.time;
+    const auto elapsed = current.time - previous.time;
+    if (!initialized || elapsed == 0 || elapsed > 0x7fffffffu) {
+        previous = current;
+        initialized = true;
+        return;
+    }
+    const double dv1 = current.v1 - previous.v1, dv2 = current.v2 - previous.v2;
+    const double dh1 = current.h1 - previous.h1, dh2 = current.h2 - previous.h2;
+    double turn = 0;
+    // DAMP pose and raw body velocity must share the same IMU turn increment.
+    // Otherwise preserve legacy heading priority.
+    if (unpowered(vertical) && unpowered(horizontal) && odomSensors.imu) {
+        turn = current.imu - previous.imu;
+    } else if (odomSensors.horizontal1 && odomSensors.horizontal2 &&
+        odomSensors.horizontal1->getOffset() != odomSensors.horizontal2->getOffset()) {
+        turn = -(dh1 - dh2) / (odomSensors.horizontal1->getOffset() - odomSensors.horizontal2->getOffset());
+    } else if (unpowered(odomSensors.vertical1) && unpowered(odomSensors.vertical2) &&
+               odomSensors.vertical1->getOffset() != odomSensors.vertical2->getOffset()) {
+        turn = -(dv1 - dv2) / (odomSensors.vertical1->getOffset() - odomSensors.vertical2->getOffset());
+    } else if (odomSensors.imu) {
+        turn = current.imu - previous.imu;
+    } else if (odomSensors.vertical1 && odomSensors.vertical2 &&
+               odomSensors.vertical1->getOffset() != odomSensors.vertical2->getOffset()) {
+        turn = -(dv1 - dv2) / (odomSensors.vertical1->getOffset() - odomSensors.vertical2->getOffset());
+    }
+    const double forward = vertical ? (vertical == odomSensors.vertical1 ? dv1 : dv2) + vo * turn : 0;
+    const double left = horizontal ? (horizontal == odomSensors.horizontal1 ? dh1 : dh2) + ho * turn : 0;
+    const auto field = damp::measurement::fieldDisplacement(forward, left, odomPose.theta, turn);
+    const double chord = std::abs(turn) < 1e-9 ? 1 : 2 * std::sin(turn / 2) / turn;
+    const double dt = elapsed * .001;
+    if (!std::isfinite(field.x) || !std::isfinite(field.y) || !std::isfinite(turn)) {
+        invalidate(current.time);
+        return;
+    }
+    odomPose.x += field.x;
+    odomPose.y += field.y;
+    odomPose.theta += turn;
+    // Preserve EMA weighting and local (left, forward) field order.
+    odomSpeed.x = ema(field.x / dt, odomSpeed.x, .95);
+    odomSpeed.y = ema(field.y / dt, odomSpeed.y, .95);
+    odomSpeed.theta = ema(turn / dt, odomSpeed.theta, .95);
+    odomLocalSpeed.x = ema(left * chord / dt, odomLocalSpeed.x, .95);
+    odomLocalSpeed.y = ema(forward * chord / dt, odomLocalSpeed.y, .95);
+    odomLocalSpeed.theta = ema(turn / dt, odomLocalSpeed.theta, .95);
+    previous = current;
+    snapshot.pose = odomPose;
+    snapshot.forwardVelocity = raw.forwardVelocity;
+    snapshot.leftVelocity = raw.leftVelocity;
+    snapshot.clockwiseAngularVelocity = raw.clockwiseAngularVelocity;
+    snapshot.dtSeconds = raw.dtSeconds;
+    snapshot.valid = raw.valid;
+}
 void arc::init() {
     if (trackingTask == nullptr) {
         trackingTask = new pros::Task {[=] {

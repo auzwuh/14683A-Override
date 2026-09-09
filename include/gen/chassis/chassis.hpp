@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gen/asset.hpp"
+#include "gen/damp/motion.hpp"
 #include "gen/chassis/trackingWheel.hpp"
 #include "gen/exitcondition.hpp"
 #include "gen/pid.hpp"
@@ -237,6 +238,10 @@ class Chassis {
         // Thin wrapper - see arc::followRamseteLQR() below, same relationship
         // as Chassis::getPose()/arc::getPose().
         void followRamseteLQR(const asset& path, RamseteLQRParams params = {});
+        damp::MotionResult followDamp(const damp::Trajectory& path, const damp::Model& model,
+                                     damp::MotionParams params = {});
+        damp::MotionResult logDampCalibration(const std::vector<damp::CalibrationStep>& steps,
+                                              std::FILE* output, double voltageLimit);
 
         void tank(int left, int right);
         void arcade(int throttle, int turn, float desaturateBias = 0.5f);

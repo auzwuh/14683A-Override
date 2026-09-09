@@ -17,3 +17,8 @@
 // is still here as a template. Flip back to 1 once this robot (or the next
 // one built from this template) has tracking wheels/IMU wired up.
 #define ARC_RAMSETE_LQR_ENABLED 0
+
+// Enable after configuring and calibrating both unpowered pods and the IMU.
+#ifndef ARC_DAMP_ENABLED
+#define ARC_DAMP_ENABLED 0
+#endif

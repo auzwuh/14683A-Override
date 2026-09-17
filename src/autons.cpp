@@ -45,97 +45,97 @@ void turnTicking(float x, float y, arc::TurnToPointParams params) {
 }
 
 void Auton::skills924() {
-    chassis.setPose(0.00f, 58.56f, 0.00f);
+    chassis.setPose(0.00f, 62.33f, 0.00f);
 
-    chassis.moveToPoint(0.00f, 62.88f, {.timeout = 559});  // 1
+    chassis.moveToPoint(0.00f, 63.20f, {.timeout = 559});  // 1
     pros::delay(100);
-    chassis.moveToPoint(0.00f, 58.32f, {.timeout = 575, .forwards = false});  // 2
+    chassis.moveToPoint(0.00f, 56.86f, {.timeout = 575, .forwards = false});  // 2
     pros::delay(100);
-    chassis.moveToPoint(0.00f, 62.88f, {.timeout = 575});  // 3
+    chassis.moveToPoint(0.00f, 63.20f, {.timeout = 575});  // 3
     pros::delay(100);
 
     // Off the wall and out to mid-field.
-    chassis.turnToPoint(-0.00f, 48.00f, {.timeout = 266, .forwards = false});
-    chassis.moveToPoint(-0.00f, 48.00f, {.timeout = 1038, .forwards = false});  // 4
+    chassis.turnToPoint(-0.00f, 46.80f, {.timeout = 266, .forwards = false});
+    chassis.moveToPoint(-0.00f, 46.80f, {.timeout = 1038, .forwards = false});  // 4
     pros::delay(100);
-    chassis.turnToPoint(-16.56f, 48.00f, {.timeout = 908, .forwards = false});
+    chassis.turnToPoint(-16.15f, 46.80f, {.timeout = 908, .forwards = false});
     robot::mech.setStage(1);
-    moveTicking(-16.56f, 48.00f, {.timeout = 1094, .forwards = false});  // 5
+    moveTicking(-16.15f, 46.80f, {.timeout = 1094, .forwards = false});  // 5
 
     holdTicking(400);
     pinRollers.move(-127);
     holdTicking(500);
     pinRollers.move(0);
 
-    chassis.turnToPoint(0.00f, 48.00f, {.timeout = 266});
+    chassis.turnToPoint(0.00f, 46.80f, {.timeout = 266});
     robot::mech.setStage(0);
-    moveTicking(0.00f, 48.00f, {.timeout = 1087});
+    moveTicking(0.00f, 46.80f, {.timeout = 1087});  // 6
     pros::delay(100);
-    chassis.turnToPoint(0.00f, 19.68f, {.timeout = 882});
-    chassis.moveToPoint(0.00f, 19.68f, {.timeout = 1446});  // 7
+    chassis.turnToPoint(0.00f, 19.19f, {.timeout = 882});
+    chassis.moveToPoint(0.00f, 19.19f, {.timeout = 1446});  // 7
 }
 
 
 void Auton::skills924Difficult() {
-    chassis.setPose(0.00f, 58.56f, 0.00f);
+    chassis.setPose(0.00f, 62.33f, 0.00f);
 
-    chassis.moveToPoint(0.00f, 62.88f, {.timeout = 559}); // 1
+    chassis.moveToPoint(0.00f, 63.20f, {.timeout = 559}); // 1
     pros::delay(100);
-    chassis.moveToPoint(0.00f, 58.32f, {.timeout = 575, .forwards = false}); // 2
+    chassis.moveToPoint(0.00f, 56.86f, {.timeout = 575, .forwards = false}); // 2
     pros::delay(100);
-    chassis.moveToPoint(0.00f, 62.88f, {.timeout = 575}); // 3
+    chassis.moveToPoint(0.00f, 63.20f, {.timeout = 575}); // 3
     pros::delay(100);
 
-    turnTicking(0.00f, 48.00f, {.timeout = 266, .forwards = false});
+    turnTicking(0.00f, 46.80f, {.timeout = 266, .forwards = false});
     robot::mech.setStage(1);
-    moveTicking(0.00f, 48.00f, {.timeout = 1038, .forwards = false}); // 4
+    moveTicking(0.00f, 46.80f, {.timeout = 1038, .forwards = false}); // 4
     holdTicking(100);
 
-    turnTicking(-16.56f, 48.00f, {.timeout = 908, .forwards = false});
-    moveTicking(-16.56f, 48.00f, {.timeout = 720, .forwards = false}); // 5
+    turnTicking(-16.15f, 46.80f, {.timeout = 908, .forwards = false});
+    moveTicking(-16.15f, 46.80f, {.timeout = 720, .forwards = false}); // 5
     holdTicking(300);
     pinRollers.move(-127);
     holdTicking(500);
     pinRollers.move(0);
 
     robot::mech.setStage(0);
-    moveTicking(-13.68f, 48.00f, {.timeout = 457}); // 6
+    moveTicking(-13.34f, 46.80f, {.timeout = 457}); // 6
     pros::delay(100);
-    chassis.turnToPoint(-13.68f, 27.12f, {.timeout = 899});
-    chassis.moveToPoint(-13.68f, 27.12f, {.timeout = 1235}); // 7
+    chassis.turnToPoint(-13.34f, 26.44f, {.timeout = 899});
+    chassis.moveToPoint(-13.34f, 26.44f, {.timeout = 1235}); // 7
     pros::delay(100);
 
-    chassis.turnToPoint(-60.00f, 42.00f, {.timeout = 984});
-    chassis.moveToPoint(-60.00f, 42.00f, {.timeout = 2140}); // 8
+    chassis.turnToPoint(-58.50f, 40.95f, {.timeout = 984});
+    chassis.moveToPoint(-58.50f, 40.95f, {.timeout = 2140}); // 8
     pros::delay(100);
-    chassis.turnToPoint(-60.00f, 54.00f, {.timeout = 805});
-    chassis.moveToPoint(-60.00f, 54.00f, {.timeout = 932}); // 9
+    chassis.turnToPoint(-58.50f, 52.65f, {.timeout = 805});
+    chassis.moveToPoint(-58.50f, 52.65f, {.timeout = 932}); // 9
     pros::delay(100);
 
     intake.move(127);
     pinRollers.move(127);
-    chassis.moveToPoint(-60.00f, 61.92f, {.timeout = 1000, .maxSpeed = 50}); // 10
+    chassis.moveToPoint(-58.50f, 60.37f, {.timeout = 1000, .maxSpeed = 50}); // 10
     pros::delay(1500);
     intake.move(0);
     pinRollers.move(0);
 
-    chassis.moveToPoint(-60.00f, 47.28f, {.timeout = 1029, .forwards = false}); // 11
+    chassis.moveToPoint(-58.50f, 46.10f, {.timeout = 1029, .forwards = false}); // 11
     pros::delay(100);
 
-    turnTicking(-31.68f, 47.76f, {.timeout = 904, .forwards = false});
+    turnTicking(-30.89f, 46.57f, {.timeout = 904, .forwards = false});
     robot::mech.setStage(2);
-    moveTicking(-31.68f, 47.76f, {.timeout = 975, .forwards = false}); // 12
+    moveTicking(-30.89f, 46.57f, {.timeout = 975, .forwards = false}); // 12
     holdTicking(300);
     pinRollers.move(-127);
     holdTicking(500);
     pinRollers.move(0);
 
     robot::mech.setStage(0);
-    turnTicking(-39.36f, 47.52f, {.timeout = 266});
-    moveTicking(-39.36f, 47.52f, {.timeout = 746}); // 13
+    turnTicking(-38.38f, 46.33f, {.timeout = 266});
+    moveTicking(-38.38f, 46.33f, {.timeout = 746}); // 13
     pros::delay(100);
-    chassis.turnToPoint(-8.16f, 11.52f, {.timeout = 1077});
-    chassis.moveToPoint(-8.16f, 11.52f, {.timeout = 2107}); // 14
+    chassis.turnToPoint(-7.96f, 11.23f, {.timeout = 1077});
+    chassis.moveToPoint(-7.96f, 11.23f, {.timeout = 2107}); // 14
 }
 
 

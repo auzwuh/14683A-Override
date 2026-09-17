@@ -12,7 +12,7 @@
 extern arc::Controller controller;
 extern arc::MotorGroup intake;
 extern arc::MotorGroup lift;
-extern arc::MotorGroup claw;
+extern arc::MotorGroup pinRollers;
 extern arc::MotorGroup clawRot;
 
 namespace robot {
@@ -29,19 +29,17 @@ int clampInt(int v, int lo, int hi) {
     return v;
 }
 
-}  // namespace
+} 
 
 void Mechanism::init() {
     lift.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
     clawRot.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
-    claw.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+    pinRollers.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 
     lift.tare_position_all();
     clawRot.tare_position_all();
-    claw.tare_position_all();
 
     stage_ = 0;
-    clawCmd_ = tune::CLAW_GRIP;
     r2HeldSince_ = 0;
     r2ResetFired_ = false;
 }
@@ -54,11 +52,12 @@ void Mechanism::driveLift() {
     lift.move(output);
 }
 
-void Mechanism::driveRotClaw() {
-    // --- intake: simple hold, no interlock ---
-    if (controller.holding(Button::L1)) intake.move(127);
-    else if (controller.holding(Button::R1)) intake.move(-127);
-    else intake.move(0);
+void Mechanism::driveRotatorAndRollers() {
+    // --- intake path: front intake and mechanically linked Pin rollers ---
+    const int rollerOutput = rollerCommand(controller.holding(Button::L1),
+                                            controller.holding(Button::R1));
+    intake.move(rollerOutput);
+    pinRollers.move(rollerOutput);
 
     // --- rotator: auto-preps for scoring, manual jog overrides it live ---
     int rotDir = 0;
@@ -72,15 +71,22 @@ void Mechanism::driveRotClaw() {
     if (rotDir != 0) {
         clawRot.move(rotDir * tune::ROT_JOG_CMD);
     } else {
-        const bool prepToScore = stage_ != 0 && lift.get_position() >= tune::LIFT_ROT_CLEAR;
-        clawRot.move_absolute(prepToScore ? tune::ROT_SCORE_DEG : tune::ROT_STOW_DEG, tune::ROT_VEL);
+        driveRotatorAuto();
     }
+}
 
-    // --- claw: toggle grip <-> open ---
-    if (controller.pressed(Button::X)) {
-        clawCmd_ = (clawCmd_ == tune::CLAW_GRIP) ? tune::CLAW_OPEN : tune::CLAW_GRIP;
-        claw.move_absolute(clawCmd_, tune::CLAW_VEL);
-    }
+void Mechanism::driveRotatorAuto() {
+    const bool prepToScore = stage_ != 0 && lift.get_position() >= tune::LIFT_ROT_CLEAR;
+    clawRot.move_absolute(prepToScore ? tune::ROT_SCORE_DEG : tune::ROT_STOW_DEG, tune::ROT_VEL);
+}
+
+void Mechanism::setStage(int s) {
+    stage_ = clampInt(s, 0, tune::LIFT_STAGE_COUNT - 1);
+}
+
+void Mechanism::tickAuton() {
+    driveLift();
+    driveRotatorAuto();
 }
 
 //
@@ -95,7 +101,6 @@ void Mechanism::driveRotClaw() {
 //   Right hold      claw rotator manual jog out (overrides auto, still
 //                    blocked until lift clears the frame)
 //   Y   hold        claw rotator manual jog home (overrides auto)
-//   X               claw grip <-> open
 //   Up  hold        TEMPORARY: jog lift up, for measuring LIFT_STAGE_DEG
 //   Down hold       TEMPORARY: jog lift down, for measuring LIFT_STAGE_DEG
 //
@@ -134,7 +139,7 @@ void Mechanism::driverTick() {
         driveLift();
     }
 
-    driveRotClaw();
+    driveRotatorAndRollers();
     updateReadout();
 }
 

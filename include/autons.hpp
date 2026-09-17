@@ -32,4 +32,13 @@ void overrideBlueRight();
 // Blue, starting flush against the TOP perimeter at the Toggle.   ~10.8 s
 void overrideBlueTop();
 
+// 924 skills. Pure drive route exported from ATTICUS (saves/924-skills.json):
+// ram the left-wall Toggle twice, then run out to mid-field. ~5.5 s.
+void skills924();
+
+// 924 skills, long variant. Pure drive route exported from ATTICUS
+// (saves/924-skills.difficult.json): same Toggle opening, then a lap of the
+// bottom-left quadrant. ~12.5 s.
+void skills924Difficult();
+
 }  // namespace Auton

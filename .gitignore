@@ -9,3 +9,10 @@ compile_commands.json
 
 # Python
 __pycache__/
+
+# Agent / tooling scratch and generated docs
+.agents/
+graphify-out/
+docs/
+images/
+scripts/

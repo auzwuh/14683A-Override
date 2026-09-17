@@ -1,6 +1,6 @@
 #pragma once
 
-// Driver-control macros for the cascade lift, claw rotator and claw.
+// Driver-control macros for the cascade lift, claw rotator and Pin rollers.
 //
 // Everything here is NON-BLOCKING. There is not a single pros::delay() in the
 // implementation - it is ticked once per opcontrol loop.
@@ -50,8 +50,33 @@
 //     }
 
 #include <cstdint>
+#include <cstdio>
 
 namespace robot {
+
+// L1 wins if both shoulder buttons are held, matching the previous intake
+// priority. The same command is sent to both the front intake and the Pin
+// rollers so a Pin transfers continuously through the robot.
+constexpr int rollerCommand(bool intakeHeld, bool outtakeHeld) {
+    if (intakeHeld) return 127;
+    if (outtakeHeld) return -127;
+    return 0;
+}
+
+struct MechanismDebugText {
+    char cascade[32]{};
+    char target[32]{};
+    char rotator[32]{};
+};
+
+inline MechanismDebugText mechanismDebugText(int stage, int targetDeg,
+                                             int cascadeDeg, int rotatorDeg) {
+    MechanismDebugText text;
+    std::snprintf(text.cascade, sizeof(text.cascade), "Cascade: %d deg", cascadeDeg);
+    std::snprintf(text.target, sizeof(text.target), "Stage %d target: %d", stage, targetDeg);
+    std::snprintf(text.rotator, sizeof(text.rotator), "Claw rot: %d deg", rotatorDeg);
+    return text;
+}
 
 // ===========================================================================
 // TUNING BLOCK - every number a mechanic needs is here and nowhere else.
@@ -87,14 +112,14 @@ constexpr std::uint32_t R2_RESET_HOLD_MS = 1000;
 // held) and read its degrees off the readout below at each position you
 // want as a stage. Delete LIFT_JOG_CMD and the jog block in driverTick()
 // once every stage has been measured - it has no place in a finished bind.
-constexpr int LIFT_JOG_CMD = 80;  // raw motor command out of 127, both directions
+constexpr int LIFT_JOG_CMD = 30;  // reduced for safe calibration with 600 RPM motors
 
 // Controller-screen refresh for the tuning readout below. The controller
 // link is slow and shared with rumble; writing faster than ~50ms starves it.
 // 200ms is plenty to read numbers off while tuning LIFT_KP/LIFT_STAGE_DEG.
 constexpr std::uint32_t READOUT_MS = 200;
 
-// --- claw rotator / claw -----------------------------------------------------
+// --- claw rotator ------------------------------------------------------------
 constexpr int ROT_JOG_CMD = 90;      // raw motor command while manually jogging
 constexpr int ROT_MIN = 0;
 constexpr int ROT_MAX = 300;
@@ -107,10 +132,6 @@ constexpr int ROT_MAX = 300;
 constexpr int ROT_STOW_DEG = 0;
 constexpr int ROT_SCORE_DEG = 90;
 constexpr int ROT_VEL = 100;   // move_absolute velocity, motor RPM
-
-constexpr int CLAW_GRIP = 0;
-constexpr int CLAW_OPEN = -75;
-constexpr int CLAW_VEL = 100;
 
 // The rotator may not swing out until the lift is at least this high, so it
 // cannot hit the frame - a real physical interlock, kept regardless of the
@@ -128,20 +149,30 @@ static_assert(LIFT_KP > 0.0, "LIFT_KP must be positive - a negative or zero gain
 
 class Mechanism {
 public:
-    // Sets brake modes and zeroes the encoders. Call from initialize() with
-    // the lift on its bottom hard stop, the rotator stowed and the claw
-    // closed.
+    // Sets brake modes and zeroes the position-controlled encoders. Call from
+    // initialize() with the lift on its bottom hard stop and the rotator
+    // stowed. The Pin rollers do not use an encoder position.
     void init();
 
-    // Reads the controller and drives the lift/rotator/claw. Call every loop.
+    // Reads the controller and drives the lift, rotator, intake and Pin
+    // rollers. Call every loop.
     void driverTick();
 
     // Which lift stage is currently targeted (0 = stowed).
     int stage() const { return stage_; }
 
+    // --- autonomous hooks: same mechanism, no controller reads --------------
+    // Select a stage from code. The rotator still auto-preps off stage_, so
+    // setStage(1) is "cascade to stage 1 and present to score".
+    void setStage(int s);
+    // Advances the lift and rotator one step. Both are loops that only move
+    // while they are being ticked, so call this on a delay during autonomous.
+    void tickAuton();
+
 private:
     void driveLift();     // P-only loop toward LIFT_STAGE_DEG[stage_]
-    void driveRotClaw();  // rotator jog + interlock, claw toggle, intake
+    void driveRotatorAuto();        // auto-prep/stow, shared with autonomous
+    void driveRotatorAndRollers();  // rotator jog + interlock, intake rollers
 
     // Bottom line of the controller screen: which stage you're on, its
     // tuned target, and where the lift actually is - the numbers you need to
@@ -150,8 +181,6 @@ private:
     void updateReadout();
 
     int stage_{0};
-    int clawCmd_{tune::CLAW_GRIP};
-
     // R2 tap-vs-hold bookkeeping: timestamp R2 was first seen held this
     // press, and whether the hold threshold already fired a reset (so
     // releasing afterward doesn't ALSO step the stage down).

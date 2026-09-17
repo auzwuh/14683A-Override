@@ -18,6 +18,13 @@
 // one built from this template) has tracking wheels/IMU wired up.
 #define ARC_RAMSETE_LQR_ENABLED 0
 
+// The field routines still target the retired winch-style mechanism constants.
+// Keep them out of debug builds until the measured cascade/rotator values are
+// available and the routines are rewritten around the current mechanism.
+#ifndef ARC_FIELD_AUTONS_ENABLED
+#define ARC_FIELD_AUTONS_ENABLED 0
+#endif
+
 // Enable after configuring and calibrating both unpowered pods and the IMU.
 #ifndef ARC_DAMP_ENABLED
 #define ARC_DAMP_ENABLED 0

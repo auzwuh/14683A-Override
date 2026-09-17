@@ -28,8 +28,8 @@ arc::MotorGroup leftDrive({18, 17}, 600.0, 1.33);
 arc::MotorGroup rightDrive({20, 19}, 600.0, 1.33);
 arc::MotorGroup intake({12}, 600.0, 1.0);
 
-arc::MotorGroup lift({2, 3}, 200.0, 1.0);     // cascade lift
-arc::MotorGroup claw({4}, 200.0, 0.25);      
+arc::MotorGroup lift({2, 3}, 600.0, 1.0);     // cascade lift
+arc::MotorGroup pinRollers({4}, 200.0, 0.25); // mechanically linked Pin rollers
 arc::MotorGroup clawRot({5}, 200.0, 0.25);    
 pros::Rotation horizontalEncoder(-15);
 pros::Rotation verticalEncoder(-16);
@@ -126,16 +126,6 @@ void doNothing() {}
 
 
 robot::AutonRoutineList autonRoutines = {
-    {"Red - Left", static_cast<robot::AutonFunc>(Auton::overrideRedLeft)},
-    {"Red - Bottom", static_cast<robot::AutonFunc>(Auton::overrideRedBottom)},
-    {"Blue - Right", static_cast<robot::AutonFunc>(Auton::overrideBlueRight)},
-    {"Blue - Top", static_cast<robot::AutonFunc>(Auton::overrideBlueTop)},
-    {"Boomerang Test", static_cast<robot::AutonFunc>(Auton::boomerangTest)},
-#if ARC_RAMSETE_LQR_ENABLED
-    {"RAMSETE-LQR Test Routine", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
-    {"RAMSETE-LQR Tau Step Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTauTest)},
-#endif
-    {"PID Test", static_cast<robot::AutonFunc>(Auton::pidTest)},
     {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
 };
 
@@ -165,12 +155,65 @@ const robot::SelectorConfig autonSelectorConfig{
 
 robot::AutonSelector autonSelector(autonSelectorConfig, autonRoutines);
 
+namespace {
+
+lv_obj_t* cascadeDebugLabel = nullptr;
+lv_obj_t* targetDebugLabel = nullptr;
+lv_obj_t* rotatorDebugLabel = nullptr;
+pros::Task* mechanismDebugTask = nullptr;
+
+void startMechanismDebugScreen() {
+    lv_obj_t* screen = lv_screen_active();
+    lv_obj_clean(screen);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x06111f), LV_PART_MAIN);
+
+    lv_obj_t* title = lv_label_create(screen);
+    lv_label_set_text(title, "MECHANISM CALIBRATION");
+    lv_obj_set_style_text_color(title, lv_color_hex(0x49b6ff), LV_PART_MAIN);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_pos(title, 20, 18);
+
+    cascadeDebugLabel = lv_label_create(screen);
+    targetDebugLabel = lv_label_create(screen);
+    rotatorDebugLabel = lv_label_create(screen);
+    for (lv_obj_t* label : {cascadeDebugLabel, targetDebugLabel, rotatorDebugLabel}) {
+        lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), LV_PART_MAIN);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_24, LV_PART_MAIN);
+    }
+    lv_obj_set_pos(cascadeDebugLabel, 20, 70);
+    lv_obj_set_pos(targetDebugLabel, 20, 110);
+    lv_obj_set_pos(rotatorDebugLabel, 20, 150);
+
+    lv_obj_t* help = lv_label_create(screen);
+    lv_label_set_text(help, "UP/DOWN: cascade    RIGHT/Y: rotator");
+    lv_obj_set_style_text_color(help, lv_color_hex(0xa9bfd5), LV_PART_MAIN);
+    lv_obj_set_style_text_font(help, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_pos(help, 20, 205);
+
+    mechanismDebugTask = new pros::Task([] {
+        while (true) {
+            const int stage = robot::mech.stage();
+            const auto text = robot::mechanismDebugText(
+                stage,
+                robot::tune::LIFT_STAGE_DEG[stage],
+                static_cast<int>(lift.get_position()),
+                static_cast<int>(clawRot.get_position()));
+            lv_label_set_text(cascadeDebugLabel, text.cascade);
+            lv_label_set_text(targetDebugLabel, text.target);
+            lv_label_set_text(rotatorDebugLabel, text.rotator);
+            pros::delay(100);
+        }
+    }, "Mechanism Debug");
+}
+
+}
+
 void initialize() {
     chassis.calibrate();
     chassis.setPose(0, 0, 0);
 
     robot::mech.init();
-    autonSelector.start();
+    startMechanismDebugScreen();
     // controller.raw().rumble(".");
 }
 
@@ -178,26 +221,11 @@ namespace {
 
 void pidTestPause() { pros::delay(500); }
 
-void showSelectionWhileDisabled() {
-    char last[24] = {};
-    while (true) {
-        const std::size_t index = autonSelector.selectedIndex();
-        char buf[24];
-        std::snprintf(buf, sizeof(buf), "%-14.14s",
-                      index < autonRoutines.size() ? autonRoutines[index].first.c_str() : "?");
-        if (std::strcmp(buf, last) != 0) {
-            std::snprintf(last, sizeof(last), "%s", buf);
-            controller.raw().set_text(0, 0, buf);
-        }
-        pros::delay(100);
-    }
 }
 
-}
+void disabled() {}
 
-void disabled() { showSelectionWhileDisabled(); }
-
-void competition_initialize() { showSelectionWhileDisabled(); }
+void competition_initialize() {}
 
 void Auton::boomerangTest() {
     // chassis.moveToPose(24, 24, 90, {.timeout = 2000, .velocityExit = -1, .errorExit = -1, .halfPlaneExit = false, .halfPlaneTolerance = 2});
@@ -410,7 +438,7 @@ void Auton::ramseteLqrTestRoutine() {
         .maxSpeed = 100,
     });
 }
-#endif // ARC_RAMSETE_LQR_ENABLED
+#endif
 
 void Auton::pidTest() {
     chassis.setPose(0, 0, 0);
@@ -431,7 +459,7 @@ void Auton::pidTest() {
 }
 
 void autonomous() {
-    autonSelector.runSelected(Auton::doNothing);
+    Auton::skills924();
 }
 
 void opcontrol() {

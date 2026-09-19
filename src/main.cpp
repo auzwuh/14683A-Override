@@ -24,16 +24,16 @@ using Button = arc::Controller::Button;
 // 3) Update PID constants after tuning.
 
 arc::Controller controller(arc::Controller::DriveMode::Arcade2Stick, 3, 10.0, false);
-arc::MotorGroup leftDrive({18, 17}, 600.0, 1.33);
-arc::MotorGroup rightDrive({20, 19}, 600.0, 1.33);
+arc::MotorGroup leftDrive({-9, 10}, 600.0, 1.33);
+arc::MotorGroup rightDrive({-1, 2}, 600.0, 1.33);
 arc::MotorGroup intake({12}, 600.0, 1.0);
 
-arc::MotorGroup lift({2, 3}, 600.0, 1.0);     // cascade lift
-arc::MotorGroup pinRollers({4}, 200.0, 0.25); // mechanically linked Pin rollers
+arc::MotorGroup lift({2, 3}, 600.0, 1.0);     // change the ports cuz the drive is using these ports
+arc::MotorGroup pinRollers({4}, 200.0, 0.25); 
 arc::MotorGroup clawRot({5}, 200.0, 0.25);    
-pros::Rotation horizontalEncoder(-15);
-pros::Rotation verticalEncoder(-16);
-arc::CustomIMU imu(1, 1.01123595506);
+// pros::Rotation horizontalEncoder(-15);
+// pros::Rotation verticalEncoder(-16);
+arc::CustomIMU imu(20, 1.01123595506); // change the port to match
 
 
 // arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);

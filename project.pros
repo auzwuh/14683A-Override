@@ -592,7 +592,8 @@
       }
     },
     "upload_options": {
-      "icon": "planet"
+      "icon": "planet",
+      "description": ""
     },
     "use_early_access": false
   }

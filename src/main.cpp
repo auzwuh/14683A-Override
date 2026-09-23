@@ -23,7 +23,10 @@ using Button = arc::Controller::Button;
 // 2) Update drivetrain geometry and wheel RPM.
 // 3) Update PID constants after tuning.
 
+// auton 7.87 inches center of bot
+
 arc::Controller controller(arc::Controller::DriveMode::Arcade2Stick, 3, 10.0, false);
+<<<<<<< Updated upstream
 arc::MotorGroup leftDrive({-9, 10}, 600.0, 1.33);
 arc::MotorGroup rightDrive({-1, 2}, 600.0, 1.33);
 arc::MotorGroup intake({12}, 600.0, 1.0);
@@ -34,6 +37,18 @@ arc::MotorGroup clawRot({5}, 200.0, 0.25);
 // pros::Rotation horizontalEncoder(-15);
 // pros::Rotation verticalEncoder(-16);
 arc::CustomIMU imu(20, 1.01123595506); // change the port to match
+=======
+arc::MotorGroup leftDrive({1, 2}, 600.0, 1.33);
+arc::MotorGroup rightDrive({9, 10}, 600.0, 1.33);
+arc::MotorGroup intake({12}, 600.0, 1.0);
+
+arc::MotorGroup lift({6, 3}, 600.0, 1.0);     // cascade lift
+arc::MotorGroup pinRollers({4}, 200.0, 0.25); // mechanically linked Pin rollers
+arc::MotorGroup clawRot({5}, 200.0, 0.25);    
+// pros::Rotation horizontalEncoder(-15);
+// pros::Rotation verticalEncoder(-16);
+arc::CustomIMU imu(20, 1.01123595506);
+>>>>>>> Stashed changes
 
 
 // arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);

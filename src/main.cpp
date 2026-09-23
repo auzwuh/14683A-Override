@@ -28,7 +28,7 @@ arc::MotorGroup leftDrive({-9, 10}, 600.0, 1.33);
 arc::MotorGroup rightDrive({-1, 2}, 600.0, 1.33);
 arc::MotorGroup intake({12}, 600.0, 1.0);
 
-arc::MotorGroup lift({2, 3}, 600.0, 1.0);     // change the ports cuz the drive is using these ports
+arc::MotorGroup lift({6, 3}, 600.0, 1.0);
 arc::MotorGroup pinRollers({4}, 200.0, 0.25); 
 arc::MotorGroup clawRot({5}, 200.0, 0.25);    
 // pros::Rotation horizontalEncoder(-15);
@@ -43,7 +43,7 @@ arc::CustomIMU imu(20, 1.01123595506); // change the port to match
 // arc::PistonGroup wings({{"wing", &wingPiston}});
 
 constexpr arc::Motion::DrivetrainProfile drivetrainProfile{
-    .trackWidthIn = 11.0f,
+    .trackWidthIn = 10.63f,
     .wheelDiameterIn = arc::Omniwheel::NEW_275,
     .wheelRpm = 450.0f,
     .horizontalDrift = 8.0f,
@@ -466,6 +466,7 @@ void opcontrol() {
 #if ARC_RAMSETE_LQR_ENABLED
     Auton::ramseteLqrTestRoutine(); //test ramsete lqr path following
 #endif
+    controller.raw().rumble("."); 
     while (true) {
         const auto [leftOutput, rightOutput] = controller.arcade_two_stick();
         chassis.tank(leftOutput, rightOutput);

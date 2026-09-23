@@ -53,13 +53,10 @@ void Mechanism::driveLift() {
 }
 
 void Mechanism::driveRotatorAndRollers() {
-    // --- intake path: front intake and mechanically linked Pin rollers ---
-    const int rollerOutput = rollerCommand(controller.holding(Button::L1),
-                                            controller.holding(Button::R1));
+    const int rollerOutput = rollerCommand(controller.holding(Button::L1), controller.holding(Button::R1));
     intake.move(rollerOutput);
     pinRollers.move(rollerOutput);
 
-    // --- rotator: auto-preps for scoring, manual jog overrides it live ---
     int rotDir = 0;
     if (controller.holding(Button::Right)) rotDir = 1;
     else if (controller.holding(Button::Y)) rotDir = -1;

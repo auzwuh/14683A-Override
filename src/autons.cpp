@@ -1,7 +1,6 @@
 #include "gen/features.hpp"
 
 #include "autons.hpp"
-#include "macros.hpp"
 #include "gen/chassis/chassis.hpp"
 #include "gen/electronics.h"
 #include "pros/rtos.hpp"
@@ -15,30 +14,16 @@ namespace {
 void moveTicking(float x, float y, arc::MoveToPointParams params) {
     params.async = true;
     chassis.moveToPoint(x, y, params);
-    while (chassis.isInMotion()) {
-        robot::mech.tickAuton();
-        pros::delay(10);
-    }
     chassis.waitUntilDone();
 }
 
 void holdTicking(int ms) {
-    const std::uint32_t end = pros::millis() + static_cast<std::uint32_t>(ms);
-    while (pros::millis() < end) {
-        robot::mech.tickAuton();
-        pros::delay(10);
-    }
+    pros::delay(ms);
 }
 
-// Same as moveTicking, for turns - a blocking turn would stop commanding the
-// lift and let a raised cascade sag.
 void turnTicking(float x, float y, arc::TurnToPointParams params) {
     params.async = true;
     chassis.turnToPoint(x, y, params);
-    while (chassis.isInMotion()) {
-        robot::mech.tickAuton();
-        pros::delay(10);
-    }
     chassis.waitUntilDone();
 }
 
@@ -59,7 +44,6 @@ void Auton::skills924() {
     chassis.moveToPoint(-0.00f, 46.80f, {.timeout = 1038, .forwards = false});  // 4
     pros::delay(100);
     chassis.turnToPoint(-16.15f, 46.80f, {.timeout = 908, .forwards = false});
-    robot::mech.setStage(1);
     moveTicking(-16.15f, 46.80f, {.timeout = 1094, .forwards = false});  // 5
 
     holdTicking(400);
@@ -68,7 +52,6 @@ void Auton::skills924() {
     pinRollers.move(0);
 
     chassis.turnToPoint(0.00f, 46.80f, {.timeout = 266});
-    robot::mech.setStage(0);
     moveTicking(0.00f, 46.80f, {.timeout = 1087});  // 6
     pros::delay(100);
     chassis.turnToPoint(0.00f, 19.19f, {.timeout = 882});
@@ -87,7 +70,6 @@ void Auton::skills924Difficult() {
     pros::delay(100);
 
     turnTicking(0.00f, 46.80f, {.timeout = 266, .forwards = false});
-    robot::mech.setStage(1);
     moveTicking(0.00f, 46.80f, {.timeout = 1038, .forwards = false}); // 4
     holdTicking(100);
 
@@ -98,7 +80,6 @@ void Auton::skills924Difficult() {
     holdTicking(500);
     pinRollers.move(0);
 
-    robot::mech.setStage(0);
     moveTicking(-13.34f, 46.80f, {.timeout = 457}); // 6
     pros::delay(100);
     chassis.turnToPoint(-13.34f, 26.44f, {.timeout = 899});
@@ -123,14 +104,12 @@ void Auton::skills924Difficult() {
     pros::delay(100);
 
     turnTicking(-30.89f, 46.57f, {.timeout = 904, .forwards = false});
-    robot::mech.setStage(2);
     moveTicking(-30.89f, 46.57f, {.timeout = 975, .forwards = false}); // 12
     holdTicking(300);
     pinRollers.move(-127);
     holdTicking(500);
     pinRollers.move(0);
 
-    robot::mech.setStage(0);
     turnTicking(-38.38f, 46.33f, {.timeout = 266});
     moveTicking(-38.38f, 46.33f, {.timeout = 746}); // 13
     pros::delay(100);
@@ -143,7 +122,6 @@ void Auton::skills924Difficult() {
 
 #include "autons.hpp"
 
-#include "macros.hpp"
 #include "gen/chassis/chassis.hpp"
 #include "gen/electronics.h"
 #include "pros/rtos.hpp"

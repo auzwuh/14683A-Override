@@ -1024,9 +1024,6 @@ void Chassis::followAPS(const asset& pathAsset, APSParams params) {
 // drivetrain/lateralSettings every other motion in this file uses.
 // Chassis::followRamseteLQR() below just forwards here.
 #if !ARC_RAMSETE_LQR_ENABLED
-// Disabled per include/gen/features.hpp - every caller (Chassis, autons,
-// opcontrol) gets a harmless no-op instead of running pose feedback blind
-// on a robot with no/unreliable odometry. Nothing else needs to change.
 void followRamseteLQR(Chassis&, const asset&, RamseteLQRParams) {}
 #else
 void followRamseteLQR(Chassis& chassis, const asset& pathAsset, RamseteLQRParams params) {

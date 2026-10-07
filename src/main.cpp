@@ -1,18 +1,10 @@
 #include "main.h"
 #include "autons.hpp"
-#include "macros.hpp"
 #include "GenSelector/selector.hpp"
-#include "gen/asset.hpp"
-#include "gen/chassis/odom.hpp"
 #include "gen/electronics.h"
 #include "gen/features.hpp"
 #include "gen/setup.hpp"
-#include "pros/distance.hpp"
 
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
 
 using DriveMode = arc::Controller::DriveMode;
 using Button = arc::Controller::Button;
@@ -109,16 +101,10 @@ double selectorX() { return chassis.getPose().x; }
 double selectorY() { return chassis.getPose().y; }
 double selectorTheta() { return chassis.getPose().theta; }
 
-ASSET(autonomous_seg0_path_txt);
-ASSET(autonomous_seg1_path_txt);
-ASSET(autonomous_seg2_path_txt);
 
 namespace Auton {
 
 void boomerangTest();
-void ramseteLqrPathTest();
-void ramseteLqrTestRoutine();
-void ramseteLqrTauTest();
 void pidTest();
 void doNothing() {}
 
@@ -127,6 +113,10 @@ void doNothing() {}
 
 robot::AutonRoutineList autonRoutines = {
     {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
+#if ARC_RAMSETE_LQR_ENABLED
+    {"RAMSETE-LQR Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
+    {"RAMSETE-LQR Tau Step", static_cast<robot::AutonFunc>(Auton::ramseteLqrTauTest)},
+#endif
 };
 
 const robot::SelectorConfig autonSelectorConfig{
@@ -155,65 +145,10 @@ const robot::SelectorConfig autonSelectorConfig{
 
 robot::AutonSelector autonSelector(autonSelectorConfig, autonRoutines);
 
-namespace {
-
-lv_obj_t* cascadeDebugLabel = nullptr;
-lv_obj_t* targetDebugLabel = nullptr;
-lv_obj_t* rotatorDebugLabel = nullptr;
-pros::Task* mechanismDebugTask = nullptr;
-
-void startMechanismDebugScreen() {
-    lv_obj_t* screen = lv_screen_active();
-    lv_obj_clean(screen);
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x06111f), LV_PART_MAIN);
-
-    lv_obj_t* title = lv_label_create(screen);
-    lv_label_set_text(title, "MECHANISM CALIBRATION");
-    lv_obj_set_style_text_color(title, lv_color_hex(0x49b6ff), LV_PART_MAIN);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_24, LV_PART_MAIN);
-    lv_obj_set_pos(title, 20, 18);
-
-    cascadeDebugLabel = lv_label_create(screen);
-    targetDebugLabel = lv_label_create(screen);
-    rotatorDebugLabel = lv_label_create(screen);
-    for (lv_obj_t* label : {cascadeDebugLabel, targetDebugLabel, rotatorDebugLabel}) {
-        lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), LV_PART_MAIN);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_24, LV_PART_MAIN);
-    }
-    lv_obj_set_pos(cascadeDebugLabel, 20, 70);
-    lv_obj_set_pos(targetDebugLabel, 20, 110);
-    lv_obj_set_pos(rotatorDebugLabel, 20, 150);
-
-    lv_obj_t* help = lv_label_create(screen);
-    lv_label_set_text(help, "UP/DOWN: cascade    RIGHT/Y: rotator");
-    lv_obj_set_style_text_color(help, lv_color_hex(0xa9bfd5), LV_PART_MAIN);
-    lv_obj_set_style_text_font(help, &lv_font_montserrat_16, LV_PART_MAIN);
-    lv_obj_set_pos(help, 20, 205);
-
-    mechanismDebugTask = new pros::Task([] {
-        while (true) {
-            const int stage = robot::mech.stage();
-            const auto text = robot::mechanismDebugText(
-                stage,
-                robot::tune::LIFT_STAGE_DEG[stage],
-                static_cast<int>(lift.get_position()),
-                static_cast<int>(clawRot.get_position()));
-            lv_label_set_text(cascadeDebugLabel, text.cascade);
-            lv_label_set_text(targetDebugLabel, text.target);
-            lv_label_set_text(rotatorDebugLabel, text.rotator);
-            pros::delay(100);
-        }
-    }, "Mechanism Debug");
-}
-
-}
-
 void initialize() {
     chassis.calibrate();
     chassis.setPose(0, 0, 0);
 
-    robot::mech.init();
-    startMechanismDebugScreen();
     // controller.raw().rumble(".");
 }
 
@@ -387,58 +322,6 @@ void Auton::boomerangTest() {
 
 }
 
-#if ARC_RAMSETE_LQR_ENABLED
-
-void Auton::ramseteLqrTauTest() {
-    constexpr float kStepDuty = 80.0f;
-    constexpr int kDurationMs = 1500; 
-    constexpr int kSampleMs = 10;
-
-    chassis.setPose(0, 0, 0);
-    FILE* log = std::fopen("/usd/ramsete_tau_step.csv", "w");
-    if (log != nullptr) std::fprintf(log, "t_ms,in_per_sec\n");
-
-    const std::uint32_t start = pros::millis();
-    std::uint32_t t = 0;
-    while (t <= static_cast<std::uint32_t>(kDurationMs)) {
-        chassis.tank(static_cast<int>(kStepDuty), static_cast<int>(kStepDuty));
-        const arc::Pose velocity = arc::getSpeed(false);
-        const float speed = std::hypot(velocity.x, velocity.y);
-        if (log != nullptr) std::fprintf(log, "%lu,%.4f\n", static_cast<unsigned long>(t), speed);
-        pros::delay(kSampleMs);
-        t = pros::millis() - start;
-    }
-    chassis.tank(0, 0);
-    if (log != nullptr) std::fclose(log);
-}
-
-void Auton::ramseteLqrTestRoutine() {
-    chassis.setPose(-60.0, -0.0, 0.0);
-
-    chassis.turnToPoint(-24.0, -24.0, {.timeout = 868});
-    arc::followRamseteLQR(chassis, autonomous_seg0_path_txt, {
-        .timeout = 2173,
-        .velocityExit = 6,
-        .errorExit = -1,
-        .maxSpeed = 100,
-    });
-    pros::delay(100);
-    arc::followRamseteLQR(chassis, autonomous_seg1_path_txt, {
-        .timeout = 2874,
-        .velocityExit = 6,
-        .errorExit = -1,
-        .maxSpeed = 100,
-    });
-    pros::delay(100);
-    chassis.turnToPoint(48.0, -0.0, {.timeout = 591});
-    arc::followRamseteLQR(chassis, autonomous_seg2_path_txt, {
-        .timeout = 2192,
-        .velocityExit = 6,
-        .errorExit = -1,
-        .maxSpeed = 100,
-    });
-}
-#endif
 
 void Auton::pidTest() {
     chassis.setPose(0, 0, 0);
@@ -463,14 +346,10 @@ void autonomous() {
 }
 
 void opcontrol() {
-#if ARC_RAMSETE_LQR_ENABLED
-    Auton::ramseteLqrTestRoutine(); //test ramsete lqr path following
-#endif
     controller.raw().rumble("."); 
     while (true) {
         const auto [leftOutput, rightOutput] = controller.arcade_two_stick();
         chassis.tank(leftOutput, rightOutput);
-        robot::mech.driverTick();
 
         pros::delay(10);
     }

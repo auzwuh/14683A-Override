@@ -412,8 +412,11 @@ class WallLocalizer {
     DistanceMount mounts[3] = {
         // planned from dr4b.step (track centre to sensor face), re-measure after mounting
         {&distFront(), 5.71, 7.75, 0.0, NAN},   // front, right outer rail front end, 4.5 in up
-        {&distLeft(), -4.96, 1.99, -90.0, NAN}, // left tower outer face, 7 in up
-        {&distRight(), 4.96, 1.99, 90.0, NAN},  // right tower outer face, 7 in up
+        // Sides 0.5 in ahead of the drive centre, not 1.99. Further forward than 1.6 the beam
+        // to the red wall passes too close to the wall stack Cups at all 7 lane Goal stops and
+        // those resets are rejected. Works from -0.75 to 1.6, so 0.5 leaves about 1 in either way.
+        {&distLeft(), -4.96, 0.5, -90.0, NAN},  // left tower outer face, 7 in up
+        {&distRight(), 4.96, 0.5, 90.0, NAN},   // right tower outer face, 7 in up
     };
     bool verbose = true;
 

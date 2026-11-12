@@ -401,6 +401,9 @@ class WallLocalizer {
     int kContPeriodMs = 25;
     // shared
     double kConeHalfDeg = 15.0;
+    // Readings closer than this are not trusted (V5 sensor is least accurate right at
+    // the face, same 2 in floor as ozzymcg's Advanced-Distance-Sensor-Reset-Command)
+    double kMinRangeIn = 2.0;
     // wall squaring
     int kSquareMv = 3000;
     // Track centre to the part that touches the wall (MEASURE). dr4b.step gives 8.0 to the
@@ -527,6 +530,10 @@ class WallLocalizer {
             pros::delay(10);
         }
         const arc::Pose p0 = chassis.getPose();
+        if (!std::isfinite(p0.x) || !std::isfinite(p0.y) || !std::isfinite(p0.theta)) {
+            if (verbose) std::printf("[reset] skipped, odometry pose is not finite\n");
+            return;
+        }
         Sample s[3];
         sampleAll(s, kSamples);
         const arc::Pose p1 = chassis.getPose();
@@ -551,6 +558,7 @@ class WallLocalizer {
                 const double err = (d - predRange) * cs;
                 const double gate = d < kTrustRangeIn ? kRecoveryGateIn : kGateIn;
                 if (d > kMaxRangeIn) why = "skip, reading too long";
+                else if (d < kMinRangeIn) why = "skip, reading too short to trust";
                 else if (std::fabs(err) > gate) why = "REJECT, disagrees with odometry beyond the gate";
                 else { c[axis] += sign * err; ++n[axis]; }
             }
@@ -581,6 +589,7 @@ class WallLocalizer {
             }
             head = (head + 1) % 3;
             if (contPaused_ || busy_ || w > kContMaxTurnRate) continue;
+            if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.theta)) continue;
             double c[2] = {0, 0}; int n[2] = {0, 0};
             for (int i = 0; i < 3; ++i) {
                 const auto& m = mounts[i];
@@ -592,6 +601,7 @@ class WallLocalizer {
                 double predRange, cs, sign, ux, uy; int axis;
                 if (!beamToWall(p, m, kContSkewDeg, kMaxRangeIn, predRange, cs, axis, sign, ux, uy)) continue;
                 if (std::fabs(vx * ux + vy * uy) > kContMaxBeamSpeed) continue;   // sensor latency would lie
+                if (r[1] + m.biasIn < kMinRangeIn) continue;
                 const double err = (r[1] + m.biasIn - predRange) * cs;
                 if (std::fabs(err) > kContGateIn) continue;
                 c[axis] += sign * err; ++n[axis];

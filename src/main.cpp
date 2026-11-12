@@ -1,9 +1,11 @@
 #include "main.h"
 #include "autons.hpp"
+#include "drive_mix.hpp"
 #include "GenSelector/selector.hpp"
 #include "gen/electronics.h"
 #include "gen/features.hpp"
 #include "gen/setup.hpp"
+#include "skills_support.hpp"
 
 
 using DriveMode = arc::Controller::DriveMode;
@@ -18,32 +20,18 @@ using Button = arc::Controller::Button;
 // auton 7.87 inches center of bot
 
 arc::Controller controller(arc::Controller::DriveMode::Arcade2Stick, 3, 10.0, false);
-<<<<<<< Updated upstream
+
 arc::MotorGroup leftDrive({-9, 10}, 600.0, 1.33);
 arc::MotorGroup rightDrive({-1, 2}, 600.0, 1.33);
 arc::MotorGroup intake({12}, 600.0, 1.0);
 
-arc::MotorGroup lift({6, 3}, 600.0, 1.0);
-arc::MotorGroup pinRollers({4}, 200.0, 0.25); 
 arc::MotorGroup clawRot({5}, 200.0, 0.25);    
 // pros::Rotation horizontalEncoder(-15);
-// pros::Rotation verticalEncoder(-16);
+pros::Rotation verticalEncoder(-16);  // vertical tracking wheel (no horizontal wheel on this robot)
 arc::CustomIMU imu(20, 1.01123595506); // change the port to match
-=======
-arc::MotorGroup leftDrive({1, 2}, 600.0, 1.33);
-arc::MotorGroup rightDrive({9, 10}, 600.0, 1.33);
-arc::MotorGroup intake({12}, 600.0, 1.0);
-
-arc::MotorGroup lift({6, 3}, 600.0, 1.0);     // cascade lift
-arc::MotorGroup pinRollers({4}, 200.0, 0.25); // mechanically linked Pin rollers
-arc::MotorGroup clawRot({5}, 200.0, 0.25);    
-// pros::Rotation horizontalEncoder(-15);
-// pros::Rotation verticalEncoder(-16);
-arc::CustomIMU imu(20, 1.01123595506);
->>>>>>> Stashed changes
 
 
-// arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);
+arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);  // CHECK wheel diameter and offset
 // arc::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, 2.0, -2.469176);
 
 // arc::Piston wingPiston('A', false, "wing");
@@ -51,9 +39,9 @@ arc::CustomIMU imu(20, 1.01123595506);
 
 constexpr arc::Motion::DrivetrainProfile drivetrainProfile{
     .trackWidthIn = 10.63f,
-    .wheelDiameterIn = arc::Omniwheel::NEW_275,
+    .wheelDiameterIn = 2.75f,  // 2.75 in traction wheels
     .wheelRpm = 450.0f,
-    .horizontalDrift = 8.0f,
+    .horizontalDrift = 8.0f,   // traction wheels barely slide sideways (2 is for all omni)
 };
 
 constexpr arc::Motion::ControllerProfile lateralProfile{
@@ -98,7 +86,7 @@ constexpr arc::Motion::ControllerProfile angularProfile{
 };
 
 constexpr arc::Motion::OdomProfile odomProfile{
-    .vertical1 = nullptr,
+    .vertical1 = &verticalTrackingWheel,
     .vertical2 = nullptr,
     .horizontal1 = nullptr,
     .horizontal2 = nullptr,
@@ -163,6 +151,8 @@ robot::AutonSelector autonSelector(autonSelectorConfig, autonRoutines);
 void initialize() {
     chassis.calibrate();
     chassis.setPose(0, 0, 0);
+    dr4b::zeroAtRest();  // lift must be resting on its bottom stop at power-on
+    dr4b::computeRouteTargets();   // fills the Goal angles from the stacking model
 
     // controller.raw().rumble(".");
 }
@@ -357,13 +347,29 @@ void Auton::pidTest() {
 }
 
 void autonomous() {
-    Auton::skills924();
+    // Skills only for now. Runs the ATTICUS skills route directly, no selector.
+    skillsDr4b();
 }
 
 void opcontrol() {
-    controller.raw().rumble("."); 
+    controller.raw().rumble(".");
+    dr4b::target() = NAN;  // driver owns the lift, stops the auton hold loop writing to it
+    dr4b::motors().set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);  // lift stays put when R1/R2 are released
     while (true) {
-        const auto [leftOutput, rightOutput] = controller.arcade_two_stick();
+        // Lift, both towers together. R1 up, R2 down, slowing near the bottom stop and kTopDeg
+        const int liftCmd = controller.holding(Button::R1) ? 127 : controller.holding(Button::R2) ? -127 : 0;
+        const int liftOut = drive_mix::liftPower(liftCmd, dr4b::angle(), dr4b::kTopDeg);
+        if (liftOut == 0) dr4b::motors().brake();
+        else dr4b::motors().move(liftOut);
+
+        // Roller claw. L1 intake, L2 outtake, otherwise hold the grip
+        if (controller.holding(Button::L1)) rclaw::intake();
+        else if (controller.holding(Button::L2)) rclaw::motor().move_voltage(-12000);
+        else rclaw::hold();
+
+        const auto [leftOutput, rightOutput] = drive_mix::mix(
+            controller.raw().get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y),
+            controller.raw().get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
         chassis.tank(leftOutput, rightOutput);
 
         pros::delay(10);

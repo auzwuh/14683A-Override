@@ -6,15 +6,20 @@
 #include "gen/util.hpp"
 #include "gen/chassis/odom.hpp"
 #include "gen/chassis/trackingWheel.hpp"
-#include "gen/damp/measurement.hpp"
 
 namespace {
 pros::Task* trackingTask = nullptr;
 pros::Mutex odomMutex;
 arc::OdomSensors odomSensors(nullptr, nullptr, nullptr, nullptr, nullptr);
 arc::Pose odomPose(0, 0, 0), odomSpeed(0, 0, 0), odomLocalSpeed(0, 0, 0);
-arc::OdomSnapshot snapshot;
-arc::damp::measurement::Tracker measurement;
+struct Displacement { double x, y; };
+// Body arc distances to field displacement using the midpoint heading and chord correction.
+Displacement fieldDisplacement(double forward, double left, double heading, double deltaHeading) {
+    const double midpoint = heading + deltaHeading / 2;
+    const double chord = std::abs(deltaHeading) < 1e-9 ? 1 : 2 * std::sin(deltaHeading / 2) / deltaHeading;
+    return {chord * (forward * std::sin(midpoint) - left * std::cos(midpoint)),
+            chord * (forward * std::cos(midpoint) + left * std::sin(midpoint))};
+}
 struct Readings {
     double v1 = 0, v2 = 0, h1 = 0, h2 = 0, imu = 0;
     std::uint32_t time = 0;
@@ -51,13 +56,9 @@ Readings readSensors() {
     result.time = pros::millis();
     return result;
 }
-void invalidate(std::uint32_t time) {
-    snapshot = {};
-    snapshot.pose = odomPose;
-    snapshot.timestampMs = time;
+void invalidate() {
     odomSpeed = arc::Pose(0, 0, 0);
     odomLocalSpeed = arc::Pose(0, 0, 0);
-    measurement.reset();
     initialized = false;
 }
 arc::Pose inUnits(arc::Pose pose, bool radians) {
@@ -69,21 +70,17 @@ void arc::setSensors(arc::OdomSensors sensors, arc::Drivetrain drivetrain) {
     std::lock_guard<pros::Mutex> lock(odomMutex);
     (void)drivetrain;
     odomSensors = sensors;
-    invalidate(pros::millis());
+    invalidate();
 }
 arc::Pose arc::getPose(bool radians) {
     std::lock_guard<pros::Mutex> lock(odomMutex);
     return inUnits(odomPose, radians);
 }
-arc::OdomSnapshot arc::getOdomSnapshot() {
-    std::lock_guard<pros::Mutex> lock(odomMutex);
-    return snapshot;
-}
 void arc::setPose(arc::Pose pose, bool radians) {
     std::lock_guard<pros::Mutex> lock(odomMutex);
     if (!radians) pose.theta = degToRad(pose.theta);
     odomPose = pose;
-    invalidate(pros::millis());
+    invalidate();
 }
 arc::Pose arc::getSpeed(bool radians) {
     std::lock_guard<pros::Mutex> lock(odomMutex);
@@ -107,7 +104,7 @@ void arc::update() {
     const Readings current = readSensors();
     if (!current.valid || !std::isfinite(odomPose.x) || !std::isfinite(odomPose.y) ||
         !std::isfinite(odomPose.theta)) {
-        invalidate(current.time);
+        invalidate();
         return;
     }
     auto* vertical = unpowered(odomSensors.vertical1) ? odomSensors.vertical1 :
@@ -116,15 +113,8 @@ void arc::update() {
     auto* horizontal = unpowered(odomSensors.horizontal1) ? odomSensors.horizontal1 :
                        unpowered(odomSensors.horizontal2) ? odomSensors.horizontal2 :
                        odomSensors.horizontal1 ? odomSensors.horizontal1 : odomSensors.horizontal2;
-    const double v = vertical == odomSensors.vertical1 ? current.v1 : current.v2;
-    const double h = horizontal == odomSensors.horizontal1 ? current.h1 : current.h2;
     const double vo = vertical ? vertical->getOffset() : 0;
     const double ho = horizontal ? horizontal->getOffset() : 0;
-    const auto raw = measurement.update({v, h, current.imu, current.time,
-                                         unpowered(vertical) && unpowered(horizontal) && odomSensors.imu}, vo, ho);
-    snapshot = {};
-    snapshot.pose = odomPose;
-    snapshot.timestampMs = current.time;
     const auto elapsed = current.time - previous.time;
     if (!initialized || elapsed == 0 || elapsed > 0x7fffffffu) {
         previous = current;
@@ -134,11 +124,7 @@ void arc::update() {
     const double dv1 = current.v1 - previous.v1, dv2 = current.v2 - previous.v2;
     const double dh1 = current.h1 - previous.h1, dh2 = current.h2 - previous.h2;
     double turn = 0;
-    // DAMP pose and raw body velocity must share the same IMU turn increment.
-    // Otherwise preserve legacy heading priority.
-    if (unpowered(vertical) && unpowered(horizontal) && odomSensors.imu) {
-        turn = current.imu - previous.imu;
-    } else if (odomSensors.horizontal1 && odomSensors.horizontal2 &&
+    if (odomSensors.horizontal1 && odomSensors.horizontal2 &&
         odomSensors.horizontal1->getOffset() != odomSensors.horizontal2->getOffset()) {
         turn = -(dh1 - dh2) / (odomSensors.horizontal1->getOffset() - odomSensors.horizontal2->getOffset());
     } else if (unpowered(odomSensors.vertical1) && unpowered(odomSensors.vertical2) &&
@@ -152,11 +138,11 @@ void arc::update() {
     }
     const double forward = vertical ? (vertical == odomSensors.vertical1 ? dv1 : dv2) + vo * turn : 0;
     const double left = horizontal ? (horizontal == odomSensors.horizontal1 ? dh1 : dh2) + ho * turn : 0;
-    const auto field = damp::measurement::fieldDisplacement(forward, left, odomPose.theta, turn);
+    const auto field = fieldDisplacement(forward, left, odomPose.theta, turn);
     const double chord = std::abs(turn) < 1e-9 ? 1 : 2 * std::sin(turn / 2) / turn;
     const double dt = elapsed * .001;
     if (!std::isfinite(field.x) || !std::isfinite(field.y) || !std::isfinite(turn)) {
-        invalidate(current.time);
+        invalidate();
         return;
     }
     odomPose.x += field.x;
@@ -170,12 +156,6 @@ void arc::update() {
     odomLocalSpeed.y = ema(forward * chord / dt, odomLocalSpeed.y, .95);
     odomLocalSpeed.theta = ema(turn / dt, odomLocalSpeed.theta, .95);
     previous = current;
-    snapshot.pose = odomPose;
-    snapshot.forwardVelocity = raw.forwardVelocity;
-    snapshot.leftVelocity = raw.leftVelocity;
-    snapshot.clockwiseAngularVelocity = raw.clockwiseAngularVelocity;
-    snapshot.dtSeconds = raw.dtSeconds;
-    snapshot.valid = raw.valid;
 }
 void arc::init() {
     if (trackingTask == nullptr) {

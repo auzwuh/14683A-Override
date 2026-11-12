@@ -165,8 +165,7 @@ void initialize() {
     chassis.setPose(0, 0, 0);
     dr4b::zeroAtRest();  // lift must be resting on its bottom stop at power-on
     dr4b::computeRouteTargets();   // fills the Goal angles from the stacking model
-
-    // controller.raw().rumble(".");
+    if (preflight() > 0) controller.raw().rumble("---");  // long buzz = auton is missing tuned values, read the terminal
 }
 
 namespace {

@@ -125,6 +125,7 @@ inline bool waitSettled(int timeoutMs) {
         if (std::fabs(target() - angle()) < kTolDeg) return true;
         pros::delay(10);
     }
+    std::printf("[dr4b] NOT settled after %d ms, target %.1f deg, at %.1f\n", timeoutMs, target().load(), angle());
     return false;
 }
 
@@ -251,10 +252,15 @@ inline void computeRouteTargets() {
 // =============================================================== roller claw
 namespace rclaw {
 inline double kSeesObjectMm = NAN;  // claw sensor reading with a Cup/Pin in the throat (MEASURE)
-inline int kHoldMv = 0;             // small inward voltage that keeps the grip (tune)
-inline int kReleaseMs = 0;          // outtake time to drop the object (tune)
+inline int kHoldMv = 0;             // small inward voltage that keeps the grip. 0 = motor HOLD brake (tune)
+inline int kReleaseMs = 300;        // outtake time to drop the object (start value, tune). 0 would drop nothing
 
-inline arc::MotorGroup& motor() { static arc::MotorGroup m({skills_ports::kClawRollers}, 200.0, 1.0); return m; }
+inline arc::MotorGroup& motor() {
+    static arc::MotorGroup m({skills_ports::kClawRollers}, 200.0, 1.0);
+    static const bool braked = (m.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD), true);  // a stopped roller keeps the grip
+    (void)braked;
+    return m;
+}
 inline pros::Distance& sensor() { static pros::Distance d(skills_ports::kClawSensor); return d; }
 inline bool hasObject() {
     if (std::isnan(kSeesObjectMm)) return false;
@@ -262,7 +268,10 @@ inline bool hasObject() {
     return mm > 0 && mm < kSeesObjectMm;
 }
 inline void intake() { motor().move_voltage(12000); }
-inline void hold() { motor().move_voltage(kHoldMv); }
+inline void hold() {
+    if (kHoldMv == 0) motor().brake();
+    else motor().move_voltage(kHoldMv);
+}
 inline void release() {
     std::printf("[t %5.2f] release\n", skills::elapsedMs() / 1000.0);
     motor().move_voltage(-12000);
@@ -634,6 +643,33 @@ class WallLocalizer {
 
 
 inline WallLocalizer localizer;
+
+// Every unset value switches a feature off without an error (a NAN lift target is
+// skipped, a NAN bias means no wall fix, ...). Lists them all. Returns how many.
+inline int preflight() {
+    int n = 0;
+    auto need = [&n](bool missing, const char* what) {
+        if (missing) { std::printf("[preflight] MISSING %s\n", what); ++n; }
+    };
+    auto anyNan = [](const double* v, int count) {
+        for (int i = 0; i < count; ++i) if (std::isnan(v[i])) return true;
+        return false;
+    };
+    need(std::isnan(dr4b::kP) || std::isnan(dr4b::kD) || std::isnan(dr4b::kG), "dr4b kP kD kG, the lift never moves in auton");
+    need(std::isnan(dr4b::kTolDeg), "dr4b::kTolDeg, every lift wait is skipped and releases happen at any height");
+    need(std::isnan(dr4b::kCarry) || std::isnan(dr4b::kToggleUp) || std::isnan(dr4b::kToggleDown), "dr4b kCarry / kToggleUp / kToggleDown");
+    need(anyNan(dr4b::kShort, 4), "dr4b::kShort[0..3] (stacking model)");
+    need(anyNan(dr4b::kAlliance, 5), "dr4b::kAlliance[0..4] (stacking model)");
+    need(anyNan(dr4b::kTall, 3), "dr4b::kTall[0..2] (Tall Goal seat and base height)");
+    need(std::isnan(rclaw::kSeesObjectMm), "rclaw::kSeesObjectMm, every grip waits its full timeout and floor creeps never stop early");
+    const char* mount[3] = {"front distance biasIn, no wall fixes from it", "left distance biasIn, no wall fixes from it",
+                            "right distance biasIn, no wall fixes from it"};
+    for (int i = 0; i < 3; ++i) need(std::isnan(localizer.mounts[i].biasIn), mount[i]);
+    need(std::isnan(localizer.kFrontBumperIn), "kFrontBumperIn, the Toggle square fixes heading only");
+    need(std::isnan(localizer.kBackBumperIn), "kBackBumperIn, the back square fixes heading only");
+    std::printf("[preflight] %d missing\n", n);
+    return n;
+}
 
 // The ATTICUS-generated skills routine (src/skills_dr4b.cpp).
 void skillsDr4b();

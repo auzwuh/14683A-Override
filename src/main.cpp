@@ -1,6 +1,7 @@
 #include "main.h"
 #include "autons.hpp"
 #include "drive_mix.hpp"
+#include "dual_imu.hpp"
 #include "GenSelector/selector.hpp"
 #include "gen/electronics.h"
 #include "gen/features.hpp"
@@ -21,14 +22,21 @@ using Button = arc::Controller::Button;
 
 arc::Controller controller(arc::Controller::DriveMode::Arcade2Stick, 3, 10.0, false);
 
-arc::MotorGroup leftDrive({-9, 10}, 600.0, 1.33);
-arc::MotorGroup rightDrive({-1, 2}, 600.0, 1.33);
-arc::MotorGroup intake({12}, 600.0, 1.0);
+// Negative = reversed. Left: 2 forward, 4 reversed. Right: 11 forward, 12 reversed.
+arc::MotorGroup leftDrive({-4, 2}, 600.0, 1.33);
+arc::MotorGroup rightDrive({11, -12}, 600.0, 1.33);
 
 arc::MotorGroup clawRot({5}, 200.0, 0.25);    
 // pros::Rotation horizontalEncoder(-15);
-pros::Rotation verticalEncoder(-16);  // vertical tracking wheel (no horizontal wheel on this robot)
-arc::CustomIMU imu(20, 1.01123595506); // change the port to match
+pros::Rotation verticalEncoder(-16);  
+
+constexpr double kImuARightIn = -2.59, kImuAForwardIn = -1.43;
+constexpr double kImuBRightIn = 2.10, kImuBForwardIn = -1.43;
+constexpr int kImuPortA = 20;
+constexpr int kImuPortB = 19;      // PLACEHOLDER, set to the second sensor's real port
+constexpr double kImuScaleA = 1.0; // MEASURE on its side: 3600 / raw after 10 turns (was 1.0112 mounted flat)
+constexpr double kImuScaleB = 1.0; // MEASURE
+arc::DualIMU imu(kImuPortA, kImuPortB, {.scale = {kImuScaleA, kImuScaleB}});
 
 
 arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);  // CHECK wheel diameter and offset
@@ -39,9 +47,9 @@ arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);  // CHECK
 
 constexpr arc::Motion::DrivetrainProfile drivetrainProfile{
     .trackWidthIn = 10.63f,
-    .wheelDiameterIn = 2.75f,  // 2.75 in traction wheels
+    .wheelDiameterIn = 2.75f,  // 6 wheels, 2.75 in: omni, traction (middle), omni per side
     .wheelRpm = 450.0f,
-    .horizontalDrift = 8.0f,   // traction wheels barely slide sideways (2 is for all omni)
+    .horizontalDrift = 8.0f,   // 8 = centre traction wheels hold the robot sideways (2 is for all omni)
 };
 
 constexpr arc::Motion::ControllerProfile lateralProfile{
@@ -103,6 +111,8 @@ arc::Chassis chassis(drivetrain, lateralController, angularController, odomSenso
 double selectorX() { return chassis.getPose().x; }
 double selectorY() { return chassis.getPose().y; }
 double selectorTheta() { return chassis.getPose().theta; }
+double selectorImuA() { return imu.rawRotation(0); }
+double selectorImuB() { return imu.rawRotation(1); }
 
 
 namespace Auton {
@@ -132,13 +142,15 @@ const robot::SelectorConfig autonSelectorConfig{
     .devices = robot::SelectorDevicesConfig(
         {"Left Drive", &leftDrive, 0},
         {"Right Drive", &rightDrive, 0},
-        {"Intake", &intake, 0}
+        {"Lift", &dr4b::motors(), 0}
     ),
     .terminal = {
         .fields = {
             {"X", selectorX, 2},
             {"Y", selectorY, 2},
             {"Theta", selectorTheta, 2},
+            {"IMU A raw", selectorImuA, 1},
+            {"IMU B raw", selectorImuB, 1},
         },
         .refreshMs = 50,
     },
@@ -353,6 +365,7 @@ void autonomous() {
 
 void opcontrol() {
     controller.raw().rumble(".");
+    chassis.cancelAllMotions();  // an auton move cut off mid-run would otherwise keep fighting the sticks
     dr4b::target() = NAN;  // driver owns the lift, stops the auton hold loop writing to it
     dr4b::motors().set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);  // lift stays put when R1/R2 are released
     while (true) {

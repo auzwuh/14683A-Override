@@ -37,15 +37,15 @@ inline uint32_t elapsedMs() { return pros::millis() - startMs(); }
 }  // namespace skills
 
 // ===================================================================== ports
-// PLACEHOLDER ports (negative = reversed). Free of main.cpp's 1 2 5 9 10 12 16 20.
+// PLACEHOLDER ports (negative = reversed). Free of main.cpp's 2 4 5 11 12 16 19 20.
 // Replace with the real wiring before running.
 namespace skills_ports {
 constexpr int kLiftLeft = 3;       // PLACEHOLDER  DR4B motor, left tower
 constexpr int kLiftRight = 6;      // PLACEHOLDER  DR4B motor, right tower
-constexpr int kClawRollers = 4;    // PLACEHOLDER  vertical roller claw motor
+constexpr int kClawRollers = 10;   // PLACEHOLDER  vertical roller claw motor
 constexpr int kLiftRotation = 7;   // PLACEHOLDER  rotation sensor on the stage-1 bottom pivot shaft
 constexpr int kClawSensor = 8;     // PLACEHOLDER  distance sensor looking across the claw throat
-constexpr int kDistFront = 11;     // PLACEHOLDER  wall sensors, see README for where they go
+constexpr int kDistFront = 9;      // PLACEHOLDER  wall sensors, see README for where they go
 constexpr int kDistLeft = 13;      // PLACEHOLDER
 constexpr int kDistRight = 14;     // PLACEHOLDER
 constexpr bool kPortsSet = true;

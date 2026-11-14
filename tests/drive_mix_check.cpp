@@ -18,18 +18,25 @@ int main() {
     assert(mix(127, 0) == std::make_pair(127, 127));
     assert(mix(-127, 0) == std::make_pair(-127, -127));
     assert(mix(0, 127) == std::make_pair(127, -127));      // point turn when stopped
-    {   // full speed full right turns harder than "inner wheel stops" but still rolls forward
-        const auto [l, r] = mix(127, 127);
-        assert(l == 127 && r < 0 && l + r > 0);
+    // Turn priority 1: any turn stick turns exactly as hard while driving as standing
+    // still (within rounding), forward gives up only what the turn needs, and full
+    // forward + full turn is a point turn.
+    for (int thr = -127; thr <= 127; thr += 7) {
+        for (int turn = -127; turn <= 127; ++turn) {
+            const auto [l0, r0] = mix(0, turn);
+            const auto [l, r] = mix(thr, turn);
+            assert(std::abs((l - r) - (l0 - r0)) <= 2);
+        }
     }
+    assert(mix(127, 127) == std::make_pair(127, -127));
 
     // Full forward, sweep right. Outer stays full, inner keeps slowing (tighter with
-    // more stick), the robot never stops rolling forward, and no jumps
+    // more stick), the robot keeps rolling forward until full stick, and no jumps
     int prevR = 127;
     for (int turn = 0; turn <= 127; ++turn) {
         const auto [l, r] = mix(127, turn);
         assert(l == 127);
-        assert(r <= prevR && l + r > 0);
+        assert(r <= prevR && (turn == 127 || l + r > 0));
         assert(prevR - r <= 6);
         prevR = r;
     }

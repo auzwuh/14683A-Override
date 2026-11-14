@@ -11,17 +11,23 @@ namespace drive_mix {
 // Tuning knobs
 inline constexpr double kDeadband = 0.04;     // fraction of stick ignored around centre (about 5 of 127)
 inline constexpr double kThrottleExpo = 0.2;  // 0 = linear, 1 = cubic. Higher gives finer slow driving
-inline constexpr double kTurnExpo = 0.4;      // higher gives finer small corrections, full stick is unchanged
+// Nearly linear: equal stick travel gives equal extra turn, so the turn builds evenly
+// instead of staying soft and then kicking in near full stick (0.4 felt weak and uneven).
+inline constexpr double kTurnExpo = 0.1;      // higher gives finer small corrections, full stick is unchanged
 inline constexpr double kTurnScale = 1.0;     // overall turn authority. Lower = wider arcs, slower point turns
 // Who gives way when forward + turn ask for more than a side can do.
 // 0 = both shrink together (full speed full turn stops the inner wheel, turns slowly)
 // 1 = turn wins (full speed full turn spins in place, forward drops to 0)
-// 0.6 = in between: full speed full turn reverses the inner wheel a bit, still rolls forward
-inline constexpr double kTurnPriority = 0.6;
-// Tuned on paper for 2.75 in traction wheels at 450 rpm, 10.63 in track (about 65 in/s,
-// 700 deg/s full spin before wheel scrub, which makes real turns slower).
-// Small turn input (10%) is about 27 deg/s, half stick about 236 deg/s standing still.
-// Full forward + full turn is about 18 in/s forward while turning about 500 deg/s.
+// 1 = turn wins: the turn is exactly as strong while driving as standing still, and
+// forward only gives up what the turn needs. Full forward + full turn spins in place.
+inline constexpr double kTurnPriority = 1.0;
+// Tuned on paper for 2.75 in wheels at 450 rpm, 10.63 in track (about 65 in/s, 700 deg/s
+// full spin). Each side is omni, traction, omni with the traction wheel in the middle, so
+// the robot pivots on the traction wheels, the end omnis roll sideways, and point turns
+// scrub very little. Real turn rates sit close to these numbers.
+// Standing still: 10% stick about 39 deg/s, half stick about 314, 3/4 about 491, full 700.
+// Driving forward turns at those same rates: full forward + half turn is about 36 in/s
+// at 312 deg/s, + 3/4 turn about 19 in/s at 494 deg/s, + full turn spins in place.
 
 // Stick to -1..1. The deadband edge ramps from 0 instead of stepping, then expo
 // softens the middle while keeping full stick at full output.

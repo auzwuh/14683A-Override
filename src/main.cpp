@@ -30,16 +30,19 @@ arc::MotorGroup clawRot({5}, 200.0, 0.25);
 // pros::Rotation horizontalEncoder(-15);
 pros::Rotation verticalEncoder(-16);  
 
-constexpr double kImuARightIn = -2.59, kImuAForwardIn = -1.43;
-constexpr double kImuBRightIn = 2.10, kImuBForwardIn = -1.43;
+// Final CAD: both flat under the cross member, 2.0 in behind the traction axle (the robot origin)
+constexpr double kImuARightIn = -2.59, kImuAForwardIn = -2.00;
+constexpr double kImuBRightIn = 2.09, kImuBForwardIn = -2.00;
 constexpr int kImuPortA = 20;
 constexpr int kImuPortB = 19;      // PLACEHOLDER, set to the second sensor's real port
-constexpr double kImuScaleA = 1.0; // MEASURE on its side: 3600 / raw after 10 turns (was 1.0112 mounted flat)
+constexpr double kImuScaleA = 1.0; // MEASURE as mounted: 3600 / raw after 10 turns (was 1.0112 on the old robot)
 constexpr double kImuScaleB = 1.0; // MEASURE
 arc::DualIMU imu(kImuPortA, kImuPortB, {.scale = {kImuScaleA, kImuScaleB}});
 
 
-arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, -1.0);  // CHECK wheel diameter and offset
+// Final CAD: the two 2 in omnis sit 0.364 in RIGHT of the centre line (was -1.0, a guess from the old
+// robot). CHECK on the robot: spin 10 turns in place, the odometry should not creep forward or back.
+arc::TrackingWheel verticalTrackingWheel(&verticalEncoder, 2.0, 0.364);
 // arc::TrackingWheel horizontalTrackingWheel(&horizontalEncoder, 2.0, -2.469176);
 
 // arc::Piston wingPiston('A', false, "wing");
@@ -378,6 +381,9 @@ void opcontrol() {
         if (controller.holding(Button::L1)) rclaw::intake();
         else if (controller.holding(Button::L2)) rclaw::motor().move_voltage(-12000);
         else rclaw::hold();
+
+        // Toggle spinner, hold A
+        toggle::spin(controller.holding(Button::A));
 
         const auto [leftOutput, rightOutput] = drive_mix::mix(
             controller.raw().get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y),

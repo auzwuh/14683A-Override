@@ -26,6 +26,13 @@ Pose getPose(bool radians = false);
  */
 void setPose(Pose pose, bool radians = false);
 /**
+ * @brief Shift the position by (dx, dy) in one locked step, heading untouched
+ *
+ * A getPose() then setPose() pair overwrites whatever the tracking task added
+ * in between. Position corrections (wall fixes) use this instead.
+ */
+void nudgePose(double dx, double dy);
+/**
  * @brief Get the speed of the robot
  *
  * @param radians true for theta in radians, false for degrees. False by default

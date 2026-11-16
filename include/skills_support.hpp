@@ -14,6 +14,7 @@
 #include "gen/chassis/chassis.hpp"
 #include "gen/chassis/odom.hpp"   // arc::getSpeed for the stop reset stillness check
 #include "gen/electronics.h"
+#include "lift_ctrl.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -31,6 +32,12 @@ namespace skills {
 // settling or lift waits), so each limit keeps about 1.4 s of margin. Tune from runs.
 inline uint32_t kSkipALegAfterMs = 54000;   // A, (96,96), about 4.6 s
 inline uint32_t kLastLegStartMs = 53500;    // B, (120,120), about 5.1 s
+// Checked at the Alliance Goal before each late piece. Past the limit the robot parks
+// in the Midfield instead (+8). Start values are 60 s minus the simulated time for the
+// piece and the park after it (sim-tuned drive gains). Retime from the [t] lines.
+inline uint32_t kD24StartMs = 44000;          // back square + D24 unit onto the Alliance Goal, 12.1 s, then the park
+inline uint32_t kLoaderCycleStartMs = 49500;  // one more bottom Loader load onto the Alliance Goal, 6.0 s (7.5 worst), then the park, 3.9 s
+inline uint32_t kTallPinStartMs = 52300;      // bottom Loader Pin onto the Tall Goal, ends in the Midfield
 inline uint32_t& startMs() { static uint32_t s = 0; return s; }
 inline void markStart() { startMs() = pros::millis(); }
 inline uint32_t elapsedMs() { return pros::millis() - startMs(); }
@@ -41,13 +48,16 @@ inline uint32_t elapsedMs() { return pros::millis() - startMs(); }
 // Replace with the real wiring before running.
 namespace skills_ports {
 constexpr int kLiftLeft = 3;       // PLACEHOLDER  DR4B motor, left tower
-constexpr int kLiftRight = 6;      // PLACEHOLDER  DR4B motor, right tower
+constexpr int kLiftRight = -6;     // PLACEHOLDER  DR4B motor, right tower. The two are mirrored on one shaft, so one is
+                                   // reversed. CHECK which: R1 must raise the lift. If it drives down, move the minus
 constexpr int kClawRollers = 10;   // PLACEHOLDER  vertical roller claw motor
 constexpr int kLiftRotation = 7;   // PLACEHOLDER  rotation sensor on the stage-1 bottom pivot shaft
 constexpr int kClawSensor = 8;     // PLACEHOLDER  distance sensor looking across the claw throat
 constexpr int kDistFront = 9;      // PLACEHOLDER  wall sensors, see README for where they go
 constexpr int kDistLeft = 13;      // PLACEHOLDER
 constexpr int kDistRight = 14;     // PLACEHOLDER
+constexpr int kToggleLeft = 15;    // PLACEHOLDER  5.5 W Toggle spinner motor, left brace
+constexpr int kToggleRight = -17;  // PLACEHOLDER  5.5 W Toggle spinner motor, right brace (mirrored, so reversed)
 constexpr bool kPortsSet = true;
 static_assert(kPortsSet, "skills_support.hpp: set the ports above, then kPortsSet = true");
 }  // namespace skills_ports
@@ -59,12 +69,15 @@ namespace dr4b {
 // (kUseMotorEncoders) or from a rotation sensor on a stage 1 pivot.
 // NAN means not tuned, and dr4b::to() ignores NAN targets.
 inline bool kUseMotorEncoders = true;
-inline double kMotorDegPerLiftDeg = 4.0;   // 12T to 48T, crank arm parallel to stage 1 (dr4b.step)
+// CHECK. The CAD shows 12T to 48T only, not how the 48T turns stage 1, and the 100 rpm cartridge in
+// motors() is assumed. Raise the lift by hand until stage 1 is level: angle() must print about 51.
+inline double kMotorDegPerLiftDeg = 4.0;
 inline double kLoader = 0.0;      // pickup at the rest pose, object standing on the tiles (ASSUMED)
 inline double kFloor = 0.0;       // same pickup pose for floor Cup+Pins (ASSUMED)
-inline double kCarry = NAN;       // travel height with a held object
-inline double kToggleUp = NAN;    // claw above the wall, ready to sweep the Toggle
-inline double kToggleDown = NAN;  // end of one Toggle sweep
+inline double kCarry = NAN;       // travel height with a held object. Keep it at 20 deg or less: higher, the back of
+                                  // the lift sticks out past the frame and hits the wall on the Loader lane turns
+inline double kToggleUp = NAN;    // claw and held Pin clear above the wall and Toggle while the paddle spins
+                                  // (Toggle top 14.3 in up, 14.4 as it turns, paddle sweeps to 14.9 on the right)
 // Goal placements used by the skills route, in route order. Filled by
 // computeRouteTargets() from the stacking model below, do not type them in.
 inline double kShort[6] = {NAN, NAN, NAN, NAN, NAN, NAN};     // Short Goal, placement 1..
@@ -74,16 +87,22 @@ inline double kTall[3] = {NAN, NAN, NAN};                     // Tall Goal, plac
 // angle, see gravityShare)
 inline double kP = NAN, kD = NAN, kG = NAN;
 inline double kTolDeg = NAN;
+// Integral, volts per deg second. 0 = off. Tune kP, kD and kG first, then add a little if the
+// lift stops a degree or two off target. It only acts inside kIZoneDeg and is capped at kIMaxV.
+inline double kI = 0.0, kIZoneDeg = 3.0, kIMaxV = 2.0;
+inline int kSettleMs = 60;   // waitSettled wants the lift inside kTolDeg for this long, not just passing through
 
 inline arc::MotorGroup& motors() {
     static arc::MotorGroup m({skills_ports::kLiftLeft, skills_ports::kLiftRight}, 100.0, 1.0);
     return m;
 }
 inline pros::Rotation& sensor() { static pros::Rotation r(skills_ports::kLiftRotation); return r; }
+// NAN when nothing can be read. An unplugged motor reports infinity and is left out, so the
+// other motor's encoder still gives the angle (both are on one shaft).
 inline double angle() {
-    if (kUseMotorEncoders)
-        return 0.5 * (motors().get_position(0) + motors().get_position(1)) / kMotorDegPerLiftDeg;
-    return sensor().get_position() / 100.0;   // centidegrees -> deg
+    if (kUseMotorEncoders) return lift_ctrl::meanFinite(motors().get_position_all()) / kMotorDegPerLiftDeg;
+    const std::int32_t c = sensor().get_position();
+    return c == PROS_ERR ? NAN : c / 100.0;   // centidegrees -> deg
 }
 inline std::atomic<double>& target() { static std::atomic<double> t{NAN}; return t; }
 
@@ -101,12 +120,27 @@ inline void start() {
     if (started) return;
     started = true;
     pros::Task([] {
-        double prev = angle();
+        double prev = angle(), lastT = NAN;
+        lift_ctrl::Integral integral;
+        bool lost = false;
         while (true) {
             const double a = angle(), t = target();
             if (!std::isnan(t) && !std::isnan(kP) && !std::isnan(kD) && !std::isnan(kG)) {
-                const double v = std::clamp(kP * (t - a) - kD * (a - prev) / 0.010 + kG * gravityShare(a), -12.0, 12.0);
-                motors().move_voltage(static_cast<int>(v * 1000.0));
+                if (!std::isfinite(a)) {
+                    // no lift angle at all: stop driving. Chasing a target blind would run it into a stop at 12 V
+                    if (!lost) std::printf("[dr4b] NO ANGLE, lift motors or sensor unplugged. Lift stopped\n");
+                    lost = true;
+                    integral.sum = 0.0;
+                    motors().brake();
+                } else {
+                    lost = false;
+                    if (t != lastT) integral.sum = 0.0;   // new target, start the trim again
+                    lastT = t;
+                    const double vel = std::isfinite(prev) ? (a - prev) / 0.010 : 0.0;
+                    const double v = std::clamp(kP * (t - a) - kD * vel + integral.step(t - a, 0.010, kI, kIZoneDeg, kIMaxV) +
+                                                    kG * gravityShare(a), -12.0, 12.0);
+                    motors().move_voltage(static_cast<int>(v * 1000.0));
+                }
             }
             prev = a;
             pros::delay(10);
@@ -121,8 +155,9 @@ inline void to(double deg) {
 inline bool waitSettled(int timeoutMs) {
     if (std::isnan(target()) || std::isnan(kTolDeg)) return false;
     const auto end = pros::millis() + timeoutMs;
+    lift_ctrl::Dwell dwell;
     while (pros::millis() < end) {
-        if (std::fabs(target() - angle()) < kTolDeg) return true;
+        if (dwell.step(std::fabs(target() - angle()) < kTolDeg, 10, kSettleMs)) return true;
         pros::delay(10);
     }
     std::printf("[dr4b] NOT settled after %d ms, target %.1f deg, at %.1f\n", timeoutMs, target().load(), angle());
@@ -142,22 +177,31 @@ inline bool waitSettled(int timeoutMs) {
 //     5 - top of 1) / 4. Object CAD gives 3.32, an older reading 3.55, so measure.
 //  4. kUnitBelowPinIn. How much lower the bottom of a held Cup+Pin sits than the
 //     bottom of a held bare Pin, claw at the same angle.
-// Placement height = seat + objects already on the Goal x pitch + drop clearance.
+// The claw drives in level, so the held object must pass OVER whatever is already
+// on the Goal and then drop to nest. Release height = top of the stack on the Goal
+// (or the Goal base when empty) + claw underside + drop clearance.
 enum Goal { kShortGoal = 0, kAllianceGoal = 1, kTallGoal = 2 };
 enum Held { kPin = 0, kCupPin = 1 };
 inline std::vector<std::pair<double, double>> kLiftTable{};  // {angle deg, Pin bottom in}
 // dr4b.step side view. Directions in deg, 0 = forward, 90 = up.
-inline double kL1In = 11.495, kL2In = 14.5;   // stage lengths, hole to hole (23 and 29 holes)
-inline double kStage1RestDir = -132.8;        // tower pivot to middle pivot, lift down
+// Final CAD, dr4b (2).step. The CAD pose is NOT the rest pose (stage 1 is drawn at
+// -130.0, 0.22 in above its stop). At rest the stage 1 lower bars sit on the two
+// 5.5 W Toggle motors, which gives -128.7. Stage 2 is drawn at -25.1, and its real
+// rest is somewhere from -24.3 to -26.4 (set by which 60T tooth is meshed), so
+// MEASURE both with an angle gauge on the robot, or fill kLiftTable instead.
+inline double kL1In = 11.0, kL2In = 13.5;     // stage lengths, hole to hole (22 and 27 holes)
+inline double kStage1RestDir = -128.7;        // tower pivot to middle pivot, lift down on the 5.5 W motors
 inline double kStage2RestDir = -25.0;         // middle pivot to front pivot, lift down
 // Goal and object numbers (game object and Goal CAD, Tall Goal not known yet)
 inline double kGoalTopIn[3] = {3.25, 3.25, NAN};   // top of the Goal base
 inline double kSeatIn[3] = {0.085, 0.085, NAN};    // object bottom when seated in an empty Goal (3.25 - 3.165 nest)
 inline double kPitchIn = 3.32;                     // 6.49 tall, 3.165 nest. Check with a tape
+inline double kObjTallIn = 6.49;                   // height of one Pin or Cup standing alone
 inline double kUnitBelowPinIn = 0.0;   // both picked standing on the tiles at the same pose
 inline double kClawBelowObjIn = 0.25;  // lowest claw part below the held object's bottom (ASSUMED)
-inline double kDropClearIn = 0.4;      // release this far above the seated position
-inline double kTopDeg = 115.0;         // stage 2 vertical; beyond it the claw only moves back
+inline double kDropClearIn = 0.4;      // gap between the claw underside and the stack top / Goal base at release.
+                                       // Must be more than the lift settle error (kTolDeg x about 0.45 in per deg)
+inline double kTopDeg = 100.0;         // top of the usable stroke. Stage 2's own bars meet near 105 (final CAD). MEASURE
 
 // Rise of the held object's bottom above its pickup height at lift angle th.
 inline double riseIn(double th) {
@@ -169,9 +213,9 @@ inline double riseIn(double th) {
 }
 // Gravity load on the lift motors at lift angle a, as a share of the heaviest
 // angle. The load follows how far the claw rises per lift degree, which both
-// stages set (stage 1 rests 47 deg below level, stage 2 25, and L2 > L1), so the
-// peak is near 35 deg, not where stage 1 is level. Assumes the claw end carries
-// most of the weight.
+// stages set (stage 1 rests 51 deg below level, stage 2 25, and L2 > L1), so the
+// peak is between where the two stages are level, not where stage 1 is level.
+// Assumes the claw end carries most of the weight.
 inline double gravityShare(double a) {
     auto slope = [](double t) { return riseIn(t + 0.5) - riseIn(t - 0.5); };
     static const double peak = [&] {
@@ -183,8 +227,9 @@ inline double gravityShare(double a) {
 }
 // Angle that puts the bottom of a held Pin at heightIn. NAN if out of reach.
 inline double angleForPinBottom(double heightIn) {
+    if (std::isnan(heightIn)) return NAN;
     if (kLiftTable.size() < 2) {
-        const double top = std::isnan(kTopDeg) ? 115.0 : kTopDeg;
+        const double top = std::isnan(kTopDeg) ? 100.0 : kTopDeg;
         if (heightIn < 0.0 || heightIn > riseIn(top)) return NAN;
         double lo = 0.0, hi = top;
         for (int i = 0; i < 50; ++i) {
@@ -208,11 +253,13 @@ inline double levelAngle(Goal g, int objectsOnGoal, Held held) {
     if (std::isnan(kSeatIn[g]) || std::isnan(kPitchIn)) return NAN;
     const double below = held == kCupPin ? kUnitBelowPinIn : 0.0;
     if (std::isnan(below)) return NAN;
-    double h = kSeatIn[g] + objectsOnGoal * kPitchIn + kDropClearIn + below;
-    // First object into an empty Goal. The claw sits over the Goal base, so it
-    // releases with its lowest part above the base top and the object drops in.
-    if (objectsOnGoal == 0 && !std::isnan(kGoalTopIn[g]))
-        h = std::max(h, kGoalTopIn[g] + kClawBelowObjIn + kDropClearIn + below);
+    // What the claw has to clear on the way in: the top of the stack already on the
+    // Goal, or the Goal base when it is empty. The object is released just above
+    // that and drops the rest of the way (kObjTallIn - kPitchIn onto a stack).
+    double top = objectsOnGoal > 0 ? kSeatIn[g] + (objectsOnGoal - 1) * kPitchIn + kObjTallIn
+                                   : kSeatIn[g] - kClawBelowObjIn;
+    if (objectsOnGoal == 0 && !std::isnan(kGoalTopIn[g])) top = std::max(top, kGoalTopIn[g]);
+    const double h = top + kClawBelowObjIn + kDropClearIn + below;
     const double a = angleForPinBottom(h);
     if (!std::isnan(kTopDeg) && a > kTopDeg) return NAN;
     return a;
@@ -248,6 +295,50 @@ inline void computeRouteTargets() {
     printLevels();
 }
 }  // namespace dr4b
+
+// ============================================================ Toggle spinner
+// Two 5.5 W motors on the 45 deg braces chain-drive a paddle at the top front of
+// the robot (final CAD: 8T to 18T, paddle axis 13.0 in up, on the right; the left
+// one is not assembled in the CAD). It works from the FRONT only. The long end of
+// the paddle reaches the Toggle with the front rails 0.8 to 1.4 in from the wall,
+// and inside 0.92 the short end hits it too. Closer than 0.78 the chain jams on
+// the Toggle. Before a run park the paddle with its long end pointing BACK:
+// flip() turns whole turns, so it ends where it started.
+namespace toggle {
+inline double kMotorTurnsPerPaddleTurn = 18.0 / 8.0;   // CHECK the real sprockets
+inline double kFlipTurns = 2.0;   // paddle turns per skills visit (TUNE until the Toggle ends red; yellow to red is 2 steps)
+inline int kRpm = 200;            // 5.5 W motor speed. Flip the port signs if it spins the wrong way
+inline pros::MotorGroup& motors() {
+    static pros::MotorGroup m({skills_ports::kToggleLeft, skills_ports::kToggleRight});
+    static const bool held = (m.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD), true);  // a stopped paddle stays parked
+    (void)held;
+    return m;
+}
+// Driver. Spins while the button is held.
+inline void spin(bool on) {
+    if (on) motors().move(127);
+    else motors().brake();
+}
+// Skills. Spins the paddle kFlipTurns turns and waits for it (at most twice the expected time).
+inline void flip() {
+    const double deg = kFlipTurns * kMotorTurnsPerPaddleTurn * 360.0;
+    motors().set_encoder_units_all(pros::E_MOTOR_ENCODER_DEGREES);
+    motors().tare_position_all();
+    motors().move_relative(deg, kRpm);
+    const auto end = pros::millis() + static_cast<uint32_t>(2000.0 * std::fabs(deg) / (kRpm * 6.0)) + 200;
+    // Every motor that answers has to finish. The two are not linked, so the loaded one lags.
+    auto done = [&] {
+        for (double p : motors().get_position_all())
+            if (std::isfinite(p) && std::fabs(p - deg) > 15.0) return false;
+        return true;
+    };
+    while (pros::millis() < end && !done()) pros::delay(10);
+    motors().brake();
+    const auto pos = motors().get_position_all();
+    std::printf("[t %5.2f] toggle spun L %.0f R %.0f of %.0f motor deg\n", skills::elapsedMs() / 1000.0,
+                pos.size() > 0 ? pos[0] : NAN, pos.size() > 1 ? pos[1] : NAN, deg);
+}
+}  // namespace toggle
 
 // =============================================================== roller claw
 namespace rclaw {
@@ -385,9 +476,18 @@ inline pros::Distance& distFront() { static pros::Distance d(skills_ports::kDist
 inline pros::Distance& distLeft() { static pros::Distance d(skills_ports::kDistLeft); return d; }
 inline pros::Distance& distRight() { static pros::Distance d(skills_ports::kDistRight); return d; }
 
+// ROBOT ORIGIN. Every robot-relative distance here and in gen_route.py is measured from
+// the middle of the TRACTION wheel axle, not from the middle of the frame. The robot
+// turns about its traction wheels, and odometry (one tracking wheel + IMU) follows
+// exactly that point. Final CAD: it is 1.5 in ahead of the frame centre, so the front
+// rail ends are 6.5 in ahead of it and the back of the frame 8.55 in behind it.
+// The plate between the front rails has a V notch: a Goal base slides in until the Goal
+// centre is 4.75 in from the origin. gen_route.py reads kL1In, kL2In, the rest directions
+// and the stacking numbers from THIS file to give every stack level its own Goal stop,
+// so regenerate the route after changing any of them.
 struct DistanceMount {
     pros::Distance* dev;
-    double rightIn, forwardIn;  // from the drivetrain centre (MEASURE)
+    double rightIn, forwardIn;  // from the robot origin, the traction axle centre (MEASURE)
     double angleDeg;            // 0 = forward, 90 = right, -90 = left
     double biasIn;              // true distance minus reading (CALIBRATE)
 };
@@ -415,20 +515,31 @@ class WallLocalizer {
     double kMinRangeIn = 2.0;
     // wall squaring
     int kSquareMv = 3000;
-    // Track centre to the part that touches the wall (MEASURE). dr4b.step gives 8.0 to the
-    // front rail ends. At the back the lift bars stick out past the 7.0 in rail end in the
-    // CAD pose (stage 2 ends at 8.4), so measure the back with the lift where it will be.
+    // Robot origin (traction axle) to the part that touches the wall (MEASURE). Final CAD: 6.50
+    // to the front rail ends, 8.55 at the back (1x1 angles on the frame; the lowered lift no
+    // longer sticks out behind). The front can NOT square at the Toggle, the spinner hits it first.
     double kFrontBumperIn = NAN, kBackBumperIn = NAN;
-    // Mounts (MEASURE rightIn / forwardIn from the drivetrain centre, CALIBRATE
+    // After the push the IMU heading must be this close to the wall heading, or the
+    // robot hit the wall at an angle (or is lost) and nothing is snapped. The IMU is
+    // the only judge, so a square robot whose IMU is itself further off than this is
+    // skipped too. Watch for "[square] SKIPPED" and calibrate kImuScaleA/B first.
+    double kSquareMaxSkewDeg = 10.0;
+    // Still driving this fast at the end of the push = never reached the wall
+    // (simulated: 9 to 11 in/s pushing on open tiles, under 5 against the wall).
+    double kSquareMaxSpeedIn = 6.0;
+    // Mounts (MEASURE rightIn / forwardIn from the robot origin, the traction axle centre, CALIBRATE
     // biasIn). A mount with any NAN is ignored, so nothing corrects until filled.
     DistanceMount mounts[3] = {
-        // planned from dr4b.step (track centre to sensor face), re-measure after mounting
-        {&distFront(), 5.71, 7.75, 0.0, NAN},   // front, right outer rail front end, 4.5 in up
-        // Sides 0.5 in ahead of the drive centre, not 1.99. Further forward than 1.6 the beam
-        // to the red wall passes too close to the wall stack Cups at all 7 lane Goal stops and
-        // those resets are rejected. Works from -0.75 to 1.6, so 0.5 leaves about 1 in either way.
-        {&distLeft(), -4.96, 0.5, -90.0, NAN},  // left tower outer face, 7 in up
-        {&distRight(), 4.96, 0.5, 90.0, NAN},   // right tower outer face, 7 in up
+        // planned from the CAD (robot origin to sensor face), re-measure after mounting
+        {&distFront(), 5.71, 6.25, 0.0, NAN},   // front, right outer rail front end, 4.5 in up
+        // Sides 1.0 in BEHIND the traction axle (0.5 in ahead of the frame centre). Further forward
+        // than 0.1 the beam to the red wall passes too close to the wall stack Cups at all 7 lane
+        // Goal stops and those resets are rejected. Works from -2.25 to 0.1.
+        // Final CAD: the new 45 deg braces (right +-4.3 to 4.8) cross this spot at 7.1 to 7.8 in up,
+        // and on the right the Toggle chain (right 5.13 to 5.70) runs at 6.0 to 6.4 and 7.5 to 8.1 in up.
+        // The right sensor must sit outboard of the chain (right > 5.7) or clear of both runs.
+        {&distLeft(), -4.96, -1.0, -90.0, NAN},  // left tower outer face, 7 in up
+        {&distRight(), 4.96, -1.0, 90.0, NAN},   // right tower outer face, 7 in up
     };
     bool verbose = true;
 
@@ -463,10 +574,18 @@ class WallLocalizer {
     // 180 = back on the red wall). Snaps heading, and the axis normal to that
     // wall if the bumper offset is measured.
     void endSquare(double wallHeadingDeg, bool backwards) {
+        const arc::Pose v = arc::getSpeed();   // while still pushing
         leftDrive.move_voltage(0);
         rightDrive.move_voltage(0);
         pros::delay(20);
         const arc::Pose p = chassis.getPose();
+        const double skew = std::remainder(p.theta - wallHeadingDeg, 360.0);
+        const double speed = std::hypot(v.x, v.y);
+        if (!(std::fabs(skew) <= kSquareMaxSkewDeg) || !(speed <= kSquareMaxSpeedIn)) {
+            pauseContinuous(false);
+            std::printf("[square] SKIPPED, heading %.1f is %.1f deg off the wall, speed %.1f in/s\n", p.theta, skew, speed);
+            return;
+        }
         double x = p.x, y = p.y;
         const double bumper = backwards ? kBackBumperIn : kFrontBumperIn;
         // direction the bumper faces (toward the wall)
@@ -479,6 +598,86 @@ class WallLocalizer {
         chassis.setPose(x, y, wallHeadingDeg);
         pauseContinuous(false);
         if (verbose) std::printf("[square] heading %.1f -> %.1f, pose (%.2f, %.2f)\n", p.theta, wallHeadingDeg, x, y);
+    }
+
+    // ---------------- close on a wall by the front sensor
+    // Robot facing a wall, within 8 in of it. Reads the front sensor, then creeps on the
+    // tracking wheel until the part frontIn ahead of the robot origin is gapIn from the
+    // wall. The wall itself sets the distance, so odometry drift and the turn before it
+    // drop out. Progress is counted at the sensor, which sits beside the Toggle paddle,
+    // so a small yaw while creeping drops out too. A reading that is already too close
+    // backs the robot out. An uncalibrated sensor is used raw. With no reading at all it
+    // uses the odometry distance to the wall. Returns false if it ended over 0.25 in off.
+    int kCloseMv = 3000;          // creep voltage (TUNE: must start the robot rolling)
+    int kCloseSlowMv = 1800;      // voltage over the last inch. It is raised by itself if the robot stalls
+    double kCloseLeadIn = 0.20;   // cut the motors this far early, the robot rolls on a little (TUNE from the [close] line)
+    bool closeToWall(double frontIn, double gapIn, int timeoutMs = 1500) {
+        pauseContinuous(true);
+        chassis.cancelAllMotions();
+        Sample s[3];
+        sampleAll(s, kSamples);
+        const arc::Pose p0 = chassis.getPose();
+        const DistanceMount& m = mounts[0];
+        const bool uncal = std::isnan(m.biasIn);
+        const double d = s[0].med + (uncal ? 0.0 : m.biasIn);
+        double range = NAN;
+        const char* how = uncal ? "front sensor UNCALIBRATED (bias 0)" : "front sensor";
+        if (std::isfinite(p0.x) && std::isfinite(p0.y) && std::isfinite(p0.theta) && !std::isnan(m.forwardIn)) {
+            if (m.dev && s[0].spread <= kMaxSpreadIn && d <= kTrustRangeIn) {
+                range = d;
+            } else if (!std::isnan(m.rightIn)) {
+                DistanceMount g = m;
+                g.biasIn = 0.0;
+                double cs, sign, ux, uy; int axis;
+                if (beamToWall(p0, g, kMaxSkewDeg, kMaxRangeIn, range, cs, axis, sign, ux, uy)) how = "ODOMETRY, no front sensor reading";
+                else range = NAN;
+            }
+        }
+        if (!std::isfinite(range)) {
+            pauseContinuous(false);
+            std::printf("[close] SKIPPED, no wall in front by sensor or odometry\n");
+            return false;
+        }
+        const double travel = range - (frontIn - m.forwardIn) - gapIn;   // + = forward
+        const double dir = travel >= 0.0 ? 1.0 : -1.0, th = p0.theta * M_PI / 180.0;
+        const double side = std::isnan(m.rightIn) ? 0.0 : m.rightIn;
+        // forward progress of the sensor point: clockwise yaw moves a point on the right backwards
+        auto progress = [&](const arc::Pose& p) {
+            return ((p.x - p0.x) * std::sin(th) + (p.y - p0.y) * std::cos(th) -
+                    side * std::sin((p.theta - p0.theta) * M_PI / 180.0)) * dir;
+        };
+        const auto was = leftDrive.get_brake_mode();
+        leftDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+        rightDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+        const auto end = pros::millis() + timeoutMs;
+        double gone = 0.0, lastGone = 0.0;
+        auto lastMove = pros::millis();
+        int boost = 0;
+        while (pros::millis() < end) {
+            gone = progress(chassis.getPose());
+            const double left = std::fabs(travel) - kCloseLeadIn - gone;
+            if (left <= 0.0) break;
+            if (gone > lastGone + 0.02) { lastGone = gone; lastMove = pros::millis(); }
+            else if (pros::millis() - lastMove > 100) { boost += 200; lastMove = pros::millis(); }   // stalled, push harder
+            const int mv = static_cast<int>(dir * std::min(6000, (left > 1.0 ? kCloseMv : kCloseSlowMv) + boost));
+            leftDrive.move_voltage(mv);
+            rightDrive.move_voltage(mv);
+            pros::delay(5);
+        }
+        leftDrive.brake();
+        rightDrive.brake();
+        pros::delay(120);
+        leftDrive.set_brake_mode_all(was);
+        rightDrive.set_brake_mode_all(was);
+        leftDrive.brake();   // again, so the restored mode (HOLD during a Toggle visit) takes hold
+        rightDrive.brake();
+        gone = progress(chassis.getPose());
+        const double off = travel - gone * dir;   // + = stopped short of the target
+        const bool ok = std::fabs(off) <= 0.25;
+        pauseContinuous(false);
+        std::printf("[close] %s read %.2f in, moved %.2f of %.2f in, gap now about %.2f%s\n", how, range, gone * dir, travel,
+                    gapIn + off, ok ? "" : ", OFF TARGET");
+        return ok;
     }
 
     // Robot parked square at a known distance from a wall. Prints raw medians.
@@ -574,9 +773,8 @@ class WallLocalizer {
             if (verbose) std::printf("[reset] mount %d read %.2f pred %.2f -> %s\n", i, s[i].med + m.biasIn, predRange, why);
         }
         if (!n[0] && !n[1]) return;
-        const arc::Pose now = chassis.getPose();
         const double dx = n[0] ? c[0] / n[0] : 0.0, dy = n[1] ? c[1] / n[1] : 0.0;
-        chassis.setPose(now.x + dx, now.y + dy, now.theta);
+        arc::nudgePose(dx, dy);
         if (verbose) std::printf("[reset] applied dx %.2f dy %.2f\n", dx, dy);
     }
 
@@ -618,7 +816,7 @@ class WallLocalizer {
             if (!n[0] && !n[1]) continue;
             auto step = [this](double v) { return std::clamp(v * kContAlpha, -kContMaxStepIn, kContMaxStepIn); };
             const double dx = n[0] ? step(c[0] / n[0]) : 0.0, dy = n[1] ? step(c[1] / n[1]) : 0.0;
-            chassis.setPose(p.x + dx, p.y + dy, p.theta);
+            arc::nudgePose(dx, dy);   // not setPose(p + d): p is up to a tick old by now
         }
     }
 
@@ -644,6 +842,41 @@ class WallLocalizer {
 
 inline WallLocalizer localizer;
 
+namespace skills {
+// Out of time for the next piece. Back straight off the Goal to (bx, by), lower the
+// lift, drive through (vx, vy) and stop on (px, py), which touches the Midfield.
+// The points come from gen_route.py with the rest of the route.
+inline void parkMidfield(float bx, float by, float vx, float vy, float px, float py) {
+    std::printf("[t %5.2f] out of time, parking in the Midfield\n", elapsedMs() / 1000.0);
+    chassis.moveToPoint(bx, by, {.timeout = 600, .forwards = false});
+    dr4b::to(dr4b::kCarry);
+    chassis.turnToPoint(vx, vy, {.timeout = 900});
+    chassis.moveToPoint(vx, vy, {.timeout = 1500});
+    chassis.turnToPoint(px, py, {.timeout = 700});
+    chassis.moveToPoint(px, py, {.timeout = 2500});
+    rclaw::hold();
+}
+
+// Toggle visit, with the robot facing the wall and the front rails a few inches off it.
+// Fixes the pose off the wall, closes to gapIn with the drive held (the paddle would push
+// a coasting robot back out of reach), then spins the paddle. Skipped when the lift is
+// not up at kToggleUp, because the held Pin would be pressed on the wall.
+inline void toggleVisit(double frontIn, double gapIn) {
+    if (std::isnan(dr4b::kToggleUp) || dr4b::target().load() != dr4b::kToggleUp || !dr4b::waitSettled(400)) {
+        std::printf("[toggle] SKIPPED, the lift is not up at kToggleUp\n");
+        return;
+    }
+    localizer.resetNow();
+    pros::delay(300);
+    leftDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+    rightDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
+    localizer.closeToWall(frontIn, gapIn);
+    toggle::flip();
+    leftDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+    rightDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+}
+}  // namespace skills
+
 // Every unset value switches a feature off without an error (a NAN lift target is
 // skipped, a NAN bias means no wall fix, ...). Lists them all. Returns how many.
 inline int preflight() {
@@ -657,7 +890,7 @@ inline int preflight() {
     };
     need(std::isnan(dr4b::kP) || std::isnan(dr4b::kD) || std::isnan(dr4b::kG), "dr4b kP kD kG, the lift never moves in auton");
     need(std::isnan(dr4b::kTolDeg), "dr4b::kTolDeg, every lift wait is skipped and releases happen at any height");
-    need(std::isnan(dr4b::kCarry) || std::isnan(dr4b::kToggleUp) || std::isnan(dr4b::kToggleDown), "dr4b kCarry / kToggleUp / kToggleDown");
+    need(std::isnan(dr4b::kCarry) || std::isnan(dr4b::kToggleUp), "dr4b kCarry / kToggleUp");
     need(anyNan(dr4b::kShort, 4), "dr4b::kShort[0..3] (stacking model)");
     need(anyNan(dr4b::kAlliance, 5), "dr4b::kAlliance[0..4] (stacking model)");
     need(anyNan(dr4b::kTall, 3), "dr4b::kTall[0..2] (Tall Goal seat and base height)");
@@ -665,7 +898,6 @@ inline int preflight() {
     const char* mount[3] = {"front distance biasIn, no wall fixes from it", "left distance biasIn, no wall fixes from it",
                             "right distance biasIn, no wall fixes from it"};
     for (int i = 0; i < 3; ++i) need(std::isnan(localizer.mounts[i].biasIn), mount[i]);
-    need(std::isnan(localizer.kFrontBumperIn), "kFrontBumperIn, the Toggle square fixes heading only");
     need(std::isnan(localizer.kBackBumperIn), "kBackBumperIn, the back square fixes heading only");
     std::printf("[preflight] %d missing\n", n);
     return n;

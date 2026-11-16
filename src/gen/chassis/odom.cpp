@@ -79,8 +79,15 @@ arc::Pose arc::getPose(bool radians) {
 void arc::setPose(arc::Pose pose, bool radians) {
     std::lock_guard<pros::Mutex> lock(odomMutex);
     if (!radians) pose.theta = degToRad(pose.theta);
+    // Only the pose changes. The previous sensor readings stay, so the travel since
+    // the last update() is still counted (a wall fix every 25 ms used to drop it).
     odomPose = pose;
-    invalidate();
+}
+void arc::nudgePose(double dx, double dy) {
+    if (!std::isfinite(dx) || !std::isfinite(dy)) return;
+    std::lock_guard<pros::Mutex> lock(odomMutex);
+    odomPose.x += dx;
+    odomPose.y += dy;
 }
 arc::Pose arc::getSpeed(bool radians) {
     std::lock_guard<pros::Mutex> lock(odomMutex);

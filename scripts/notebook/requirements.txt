@@ -1,2 +1,0 @@
-pytest>=8.0
-pygments>=2.17

@@ -16,3 +16,6 @@ graphify-out/
 docs/
 images/
 scripts/
+
+# Local only, never pushed
+tests/

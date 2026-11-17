@@ -18,12 +18,12 @@ void skillsDr4b() {
     chassis.waitUntil(1.09f);
     dr4b::to(dr4b::kShort[0]);
     chassis.waitUntilDone();
-    chassis.turnToPoint(30.24f, 52.42f, {.timeout = 674});
-    chassis.moveToPoint(30.24f, 52.42f, {.timeout = 809});
+    chassis.turnToPoint(30.26f, 52.44f, {.timeout = 674});
+    chassis.moveToPoint(30.26f, 52.44f, {.timeout = 808});
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
-    chassis.moveToPoint(37.05f, 58.02f, {.timeout = 809, .forwards = false, .async = true});
+    chassis.moveToPoint(37.05f, 58.02f, {.timeout = 808, .forwards = false, .async = true});
     chassis.waitUntil(3.08f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
@@ -39,17 +39,17 @@ void skillsDr4b() {
     chassis.waitUntil(3.03f);
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
-    chassis.turnToPoint(31.63f, 46.80f, {.timeout = 850});
-    chassis.moveToPoint(31.63f, 46.80f, {.timeout = 1430, .async = true});
-    chassis.waitUntil(2.62f);
+    chassis.turnToPoint(31.70f, 46.80f, {.timeout = 850});
+    chassis.moveToPoint(31.70f, 46.80f, {.timeout = 1428, .async = true});
+    chassis.waitUntil(2.61f);
     dr4b::to(dr4b::kShort[1]);
     chassis.waitUntilDone();
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
-    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1430, .forwards = false, .async = true});
-    chassis.waitUntil(9.17f);
+    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1428, .forwards = false, .async = true});
+    chassis.waitUntil(9.14f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(58.37f, 58.89f, {.timeout = 850});
@@ -62,17 +62,17 @@ void skillsDr4b() {
     chassis.waitUntil(3.03f);
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
-    chassis.turnToPoint(30.21f, 46.80f, {.timeout = 850});
-    chassis.moveToPoint(30.21f, 46.80f, {.timeout = 1478, .async = true});
-    chassis.waitUntil(2.76f);
+    chassis.turnToPoint(30.38f, 46.80f, {.timeout = 850});
+    chassis.moveToPoint(30.38f, 46.80f, {.timeout = 1472, .async = true});
+    chassis.waitUntil(2.74f);
     dr4b::to(dr4b::kShort[2]);
     chassis.waitUntilDone();
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
-    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1478, .forwards = false, .async = true});
-    chassis.waitUntil(9.66f);
+    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1472, .forwards = false, .async = true});
+    chassis.waitUntil(9.60f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(58.37f, 58.89f, {.timeout = 850});
@@ -85,17 +85,17 @@ void skillsDr4b() {
     chassis.waitUntil(3.03f);
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
-    chassis.turnToPoint(28.59f, 46.80f, {.timeout = 850});
-    chassis.moveToPoint(28.59f, 46.80f, {.timeout = 1532, .async = true});
-    chassis.waitUntil(2.92f);
+    chassis.turnToPoint(28.79f, 46.80f, {.timeout = 850});
+    chassis.moveToPoint(28.79f, 46.80f, {.timeout = 1525, .async = true});
+    chassis.waitUntil(2.90f);
     dr4b::to(dr4b::kShort[3]);
     chassis.waitUntilDone();
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
-    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1532, .forwards = false, .async = true});
-    chassis.waitUntil(10.23f);
+    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1525, .forwards = false, .async = true});
+    chassis.waitUntil(10.16f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(58.37f, 58.89f, {.timeout = 850});
@@ -121,13 +121,13 @@ void skillsDr4b() {
     chassis.waitUntil(4.02f);
     dr4b::to(dr4b::kAlliance[0]);
     chassis.waitUntilDone();
-    chassis.turnToPoint(-14.55f, 46.80f, {.timeout = 899});
-    chassis.moveToPoint(-14.55f, 46.80f, {.timeout = 1039});
+    chassis.turnToPoint(-14.52f, 46.80f, {.timeout = 899});
+    chassis.moveToPoint(-14.52f, 46.80f, {.timeout = 1038});
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
-    chassis.moveToPoint(-7.80f, 46.80f, {.timeout = 708, .forwards = false, .async = true});
+    chassis.moveToPoint(-7.80f, 46.80f, {.timeout = 706, .forwards = false, .async = true});
     chassis.waitUntil(2.02f);
     dr4b::to(dr4b::kFloor);
     chassis.waitUntilDone();
@@ -145,14 +145,14 @@ void skillsDr4b() {
     chassis.waitUntil(1.46f);
     dr4b::to(dr4b::kAlliance[1]);
     chassis.waitUntilDone();
-    chassis.turnToPoint(-18.39f, 40.28f, {.timeout = 935});
-    chassis.moveToPoint(-18.39f, 40.28f, {.timeout = 792});
+    chassis.turnToPoint(-18.35f, 40.22f, {.timeout = 935});
+    chassis.moveToPoint(-18.35f, 40.22f, {.timeout = 789});
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
     if (skills::elapsedMs() > skills::kD24StartMs) { skills::parkMidfield(-13.24f, 33.57f, -11.92f, 22.74f, -10.60f, 11.92f); return; }
-    chassis.moveToPoint(-13.24f, 33.57f, {.timeout = 792, .forwards = false, .async = true});
-    chassis.waitUntil(2.54f);
+    chassis.moveToPoint(-13.24f, 33.57f, {.timeout = 789, .forwards = false, .async = true});
+    chassis.waitUntil(2.52f);
     dr4b::to(dr4b::kFloor);
     chassis.waitUntilDone();
     chassis.turnToPoint(-5.85f, 58.02f, {.timeout = 699});
@@ -177,15 +177,15 @@ void skillsDr4b() {
     chassis.waitUntil(2.85f);
     dr4b::to(dr4b::kAlliance[2]);
     chassis.waitUntilDone();
-    chassis.turnToPoint(-30.21f, 46.80f, {.timeout = 899});
-    chassis.moveToPoint(-30.21f, 46.80f, {.timeout = 1110});
+    chassis.turnToPoint(-30.38f, 46.80f, {.timeout = 899});
+    chassis.moveToPoint(-30.38f, 46.80f, {.timeout = 1104});
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     rclaw::release();
     pros::delay(200);
     if (skills::elapsedMs() > skills::kLoaderCycleStartMs) { skills::parkMidfield(-36.90f, 46.80f, -31.20f, 35.10f, -10.60f, 11.92f); return; }
-    chassis.moveToPoint(-57.82f, 46.80f, {.timeout = 1478, .forwards = false, .async = true});
-    chassis.waitUntil(9.66f);
+    chassis.moveToPoint(-57.82f, 46.80f, {.timeout = 1472, .forwards = false, .async = true});
+    chassis.waitUntil(9.60f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(-58.37f, 58.89f, {.timeout = 850});
@@ -198,9 +198,9 @@ void skillsDr4b() {
     chassis.waitUntil(3.03f);
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
-    chassis.turnToPoint(-28.59f, 46.80f, {.timeout = 850});
-    chassis.moveToPoint(-28.59f, 46.80f, {.timeout = 1532, .async = true});
-    chassis.waitUntil(2.92f);
+    chassis.turnToPoint(-28.79f, 46.80f, {.timeout = 850});
+    chassis.moveToPoint(-28.79f, 46.80f, {.timeout = 1525, .async = true});
+    chassis.waitUntil(2.90f);
     dr4b::to(dr4b::kAlliance[3]);
     chassis.waitUntilDone();
     localizer.applyImmediateCorrectionAuto();
@@ -208,8 +208,8 @@ void skillsDr4b() {
     rclaw::release();
     pros::delay(200);
     if (skills::elapsedMs() > skills::kLoaderCycleStartMs) { skills::parkMidfield(-36.90f, 46.80f, -31.20f, 35.10f, -10.60f, 11.92f); return; }
-    chassis.moveToPoint(-57.82f, 46.80f, {.timeout = 1532, .forwards = false, .async = true});
-    chassis.waitUntil(10.23f);
+    chassis.moveToPoint(-57.82f, 46.80f, {.timeout = 1525, .forwards = false, .async = true});
+    chassis.waitUntil(10.16f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(-58.37f, 58.89f, {.timeout = 850});
@@ -304,5 +304,5 @@ void skillsDr4b() {
     pros::delay(200);
     rclaw::hold();
 
-    // Estimated total time: 54.93 s
+    // Estimated total time: 54.89 s
 }

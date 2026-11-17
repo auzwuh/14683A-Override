@@ -69,14 +69,20 @@ namespace dr4b {
 // (kUseMotorEncoders) or from a rotation sensor on a stage 1 pivot.
 // NAN means not tuned, and dr4b::to() ignores NAN targets.
 inline bool kUseMotorEncoders = true;
-// CHECK. The CAD shows 12T to 48T only, not how the 48T turns stage 1, and the 100 rpm cartridge in
-// motors() is assumed. Raise the lift by hand until stage 1 is level: angle() must print about 51.
+// 12T to 48T: 4 lift motor degrees per degree of lift (crank) angle. Austin's table: 80 motor deg = 20 deg.
 inline double kMotorDegPerLiftDeg = 4.0;
+// LIFT LIMITS, in lift MOTOR degrees, zeroed with the lift resting on its stop. The driver
+// soft stops and every auton target stay inside them. From Austin's table: 412 is the top.
+inline double kBottomMotorDeg = 0.0, kTopMotorDeg = 412.0;
+// Austin's lift table: lift MOTOR degrees -> height (in) of the lift's front end above the tiles.
+// Goal levels are read off this table. Replace the rows with tape measurements when you have them.
+inline std::vector<std::pair<double, double>> kLiftMotorTable{
+    {0, 3.2}, {80, 11.5}, {160, 20.2}, {240, 28.3}, {320, 34.9}, {400, 39.3}, {412, 39.7}};
 inline double kLoader = 0.0;      // pickup at the rest pose, object standing on the tiles (ASSUMED)
 inline double kFloor = 0.0;       // same pickup pose for floor Cup+Pins (ASSUMED)
-inline double kCarry = NAN;       // travel height with a held object. Keep it at 20 deg or less: higher, the back of
+inline double kCarry = 8.0;       // STARTING VALUE (32 motor deg). travel height with a held object. Keep it at 20 deg or less: higher, the back of
                                   // the lift sticks out past the frame and hits the wall on the Loader lane turns
-inline double kToggleUp = NAN;    // claw and held Pin clear above the wall and Toggle while the paddle spins
+inline double kToggleUp = 37.0;   // STARTING VALUE (148 motor deg, Pin bottom 15.7 in up, 1 in over the turning Toggle). claw and held Pin clear above the wall and Toggle while the paddle spins
                                   // (Toggle top 14.3 in up, 14.4 as it turns, paddle sweeps to 14.9 on the right)
 // Goal placements used by the skills route, in route order. Filled by
 // computeRouteTargets() from the stacking model below, do not type them in.
@@ -85,15 +91,23 @@ inline double kAlliance[6] = {NAN, NAN, NAN, NAN, NAN, NAN};  // Alliance Goal, 
 inline double kTall[3] = {NAN, NAN, NAN};                     // Tall Goal, placement 1..
 // Controller (volts per deg, volts per deg/s, gravity volts at the heaviest lift
 // angle, see gravityShare)
-inline double kP = NAN, kD = NAN, kG = NAN;
-inline double kTolDeg = NAN;
+// STARTING VALUES from the simulator (17 Nov), not tuned on the robot, for 200 rpm lift
+// cartridges WITH rubber band assist. Useful ranges: kP 1.2 to 2.5 (above 3 it overshoots),
+// kD 0.07 to 0.15, kG 2.5 to 4.1 (heavier claw or weaker bands = more).
+// Set kG by hand first: with kP, kD and kI at 0, raise it until the lift holds a Cup+Pin at 37 deg.
+// WITHOUT bands the two 200 rpm motors are at their limit: about 7.6 N m at the 48T against a
+// 6.3 to 7.9 N m load at 37 deg, so the lift stalls part way up and a hold needs 5 to 6.4 V.
+// Bands should carry a third to a half of the lift's weight (2 to 4 N m at the 48T axle).
+inline double kP = 1.8, kD = 0.1, kG = 3.3;
+inline double kTolDeg = 0.75;  // STARTING VALUE (3 motor deg). The lift counts as there inside this.
+                               // Keep kTolDeg x 0.42 in per deg under kDropClearIn, or releases land low
 // Integral, volts per deg second. 0 = off. Tune kP, kD and kG first, then add a little if the
 // lift stops a degree or two off target. It only acts inside kIZoneDeg and is capped at kIMaxV.
-inline double kI = 0.0, kIZoneDeg = 3.0, kIMaxV = 2.0;
+inline double kI = 4.0, kIZoneDeg = 3.0, kIMaxV = 2.0;
 inline int kSettleMs = 60;   // waitSettled wants the lift inside kTolDeg for this long, not just passing through
 
 inline arc::MotorGroup& motors() {
-    static arc::MotorGroup m({skills_ports::kLiftLeft, skills_ports::kLiftRight}, 100.0, 1.0);
+    static arc::MotorGroup m({skills_ports::kLiftLeft, skills_ports::kLiftRight}, 200.0, 1.0);   // 200 rpm cartridges
     return m;
 }
 inline pros::Rotation& sensor() { static pros::Rotation r(skills_ports::kLiftRotation); return r; }
@@ -150,7 +164,7 @@ inline void start() {
 inline void to(double deg) {
     if (std::isnan(deg)) { std::printf("[dr4b] target not tuned, ignored\n"); return; }
     start();
-    target() = deg;
+    target() = std::clamp(deg, kBottomMotorDeg / kMotorDegPerLiftDeg, kTopMotorDeg / kMotorDegPerLiftDeg);   // never past the limits
 }
 inline bool waitSettled(int timeoutMs) {
     if (std::isnan(target()) || std::isnan(kTolDeg)) return false;
@@ -182,7 +196,13 @@ inline bool waitSettled(int timeoutMs) {
 // (or the Goal base when empty) + claw underside + drop clearance.
 enum Goal { kShortGoal = 0, kAllianceGoal = 1, kTallGoal = 2 };
 enum Held { kPin = 0, kCupPin = 1 };
-inline std::vector<std::pair<double, double>> kLiftTable{};  // {angle deg, Pin bottom in}
+// {lift angle deg, rise in}, built from kLiftMotorTable: angle = motor deg / 4, rise = height - height at rest
+inline std::vector<std::pair<double, double>> kLiftTable = [] {
+    std::vector<std::pair<double, double>> t;
+    for (const auto& [motorDeg, heightIn] : kLiftMotorTable)
+        t.push_back({motorDeg / kMotorDegPerLiftDeg, heightIn - kLiftMotorTable.front().second});
+    return t;
+}();
 // dr4b.step side view. Directions in deg, 0 = forward, 90 = up.
 // Final CAD, dr4b (2).step. The CAD pose is NOT the rest pose (stage 1 is drawn at
 // -130.0, 0.22 in above its stop). At rest the stage 1 lower bars sit on the two
@@ -193,15 +213,15 @@ inline double kL1In = 11.0, kL2In = 13.5;     // stage lengths, hole to hole (22
 inline double kStage1RestDir = -128.7;        // tower pivot to middle pivot, lift down on the 5.5 W motors
 inline double kStage2RestDir = -25.0;         // middle pivot to front pivot, lift down
 // Goal and object numbers (game object and Goal CAD, Tall Goal not known yet)
-inline double kGoalTopIn[3] = {3.25, 3.25, NAN};   // top of the Goal base
-inline double kSeatIn[3] = {0.085, 0.085, NAN};    // object bottom when seated in an empty Goal (3.25 - 3.165 nest)
+inline double kGoalTopIn[3] = {3.25, 3.25, 8.77};  // top of the Goal base. Tall is from the ATTICUS field drawing, CHECK with a tape
+inline double kSeatIn[3] = {0.085, 0.085, 5.605};  // object bottom when seated in an empty Goal (top - 3.165 nest)
 inline double kPitchIn = 3.32;                     // 6.49 tall, 3.165 nest. Check with a tape
 inline double kObjTallIn = 6.49;                   // height of one Pin or Cup standing alone
 inline double kUnitBelowPinIn = 0.0;   // both picked standing on the tiles at the same pose
 inline double kClawBelowObjIn = 0.25;  // lowest claw part below the held object's bottom (ASSUMED)
-inline double kDropClearIn = 0.4;      // gap between the claw underside and the stack top / Goal base at release.
+inline double kDropClearIn = 0.9;      // gap between the claw underside and the stack top / Goal base at release.
                                        // Must be more than the lift settle error (kTolDeg x about 0.45 in per deg)
-inline double kTopDeg = 100.0;         // top of the usable stroke. Stage 2's own bars meet near 105 (final CAD). MEASURE
+inline double kTopDeg = kTopMotorDeg / kMotorDegPerLiftDeg;   // 103 deg of lift angle = 412 motor deg (stage 2's bars meet near 105)
 
 // Rise of the held object's bottom above its pickup height at lift angle th.
 inline double riseIn(double th) {
@@ -265,6 +285,22 @@ inline double levelAngle(Goal g, int objectsOnGoal, Held held) {
     return a;
 }
 inline void toLevel(Goal g, int objectsOnGoal, Held held) { to(levelAngle(g, objectsOnGoal, held)); }
+
+// Driver lift stages. Stage k (1, 2, ...) is the release height for the k-th object
+// on a Short or Alliance Goal, so k - 1 objects are already on it. They come from the
+// same stacking model as the skills route and stop where the lift runs out.
+inline const std::vector<double>& driverStages() {
+    static const std::vector<double> stages = [] {
+        std::vector<double> v;
+        for (int n = 0; n < 20; ++n) {
+            const double a = levelAngle(kShortGoal, n, kCupPin);
+            if (std::isnan(a)) break;
+            v.push_back(a);
+        }
+        return v;
+    }();
+    return stages;
+}
 
 // Prints every level for every Goal (bare Pin and Cup+Pin) until the lift runs
 // out, so the limit is whatever the lift can reach.
@@ -518,7 +554,7 @@ class WallLocalizer {
     // Robot origin (traction axle) to the part that touches the wall (MEASURE). Final CAD: 6.50
     // to the front rail ends, 8.55 at the back (1x1 angles on the frame; the lowered lift no
     // longer sticks out behind). The front can NOT square at the Toggle, the spinner hits it first.
-    double kFrontBumperIn = NAN, kBackBumperIn = NAN;
+    double kFrontBumperIn = 6.50, kBackBumperIn = 8.55;   // CAD values, CHECK with a tape
     // After the push the IMU heading must be this close to the wall heading, or the
     // robot hit the wall at an angle (or is lost) and nothing is snapped. The IMU is
     // the only judge, so a square robot whose IMU is itself further off than this is

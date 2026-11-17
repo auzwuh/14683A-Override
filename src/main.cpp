@@ -55,12 +55,18 @@ constexpr arc::Motion::DrivetrainProfile drivetrainProfile{
     .horizontalDrift = 8.0f,   // 8 = centre traction wheels hold the robot sideways (2 is for all omni)
 };
 
+// STARTING VALUES from the simulator (17 Nov), not tuned on the robot. Swept on 9 modelled
+// robots (6.1 kg +-10 %, 3x range of drive friction). Useful ranges: kP 14 to 18, kI 30 to 60,
+// kD 0.8 to 1.2. Stops short or creeps at the end: raise kI, then kP. Overshoots or shakes
+// at the end: raise kD, then lower kP. moveToPoint always reads the kP curve at 12, so with
+// scale 12 only the average of initial and final matters. Keep them equal.
+// Before: kP 5.73, kI 0.88, kD 0.01, integralRange 6.
 constexpr arc::Motion::ControllerProfile lateralProfile{
     .gains = {
-        .proportional = {.initial = 5.73f, .final = 5.73f, .scale = 12.0f, .power = 1.0f},
-        .kI = 0.88f,
-        .kD = 0.01f,
-        .integralRange = 6.0f,
+        .proportional = {.initial = 16.0f, .final = 16.0f, .scale = 12.0f, .power = 1.0f},
+        .kI = 40.0f,
+        .kD = 0.9f,
+        .integralRange = 2.5f,
         .integralSignReset = true,
     },
     .exits = {
@@ -72,15 +78,22 @@ constexpr arc::Motion::ControllerProfile lateralProfile{
     },
 };
 
+// STARTING VALUES from the simulator (17 Nov), not tuned on the robot. Swept on 9 modelled
+// robots (8x range of turning scrub, +-30 % yaw inertia). initial is the gain near the target,
+// final the gain far from it. Useful ranges: initial 8 to 12, final 3 to 4, kI 30 to 60,
+// kD 0.35 to 0.6. Stops a degree or two short: raise kI. Overshoots: raise kD or lower final.
+// Buzzes when stopped: lower initial. Keep derivativeAlpha at 0.5 or more, 0.15 made these
+// gains overshoot badly in the simulator.
+// Before: initial 2.6, final 4.6, kI 0, kD 0.157, integralRange 5, derivativeAlpha 0.15.
 constexpr arc::Motion::ControllerProfile angularProfile{
     .gains = {
-        .proportional = {.initial = 2.6f, .final = 4.6f, .scale = 28.0f, .power = 1.5f},
+        .proportional = {.initial = 10.0f, .final = 3.5f, .scale = 28.0f, .power = 1.5f},
         .scheduleMode = arc::GainScheduleMode::FilteredCurrentError,
         .scheduleAlpha = 0.15f,
-        .derivativeAlpha = 0.15f,
-        .kI = 0.0f, 
-        .kD = 0.157f,
-        .integralRange = 5.0f,
+        .derivativeAlpha = 1.0f,
+        .kI = 60.0f,
+        .kD = 0.45f,
+        .integralRange = 8.0f,
         .integralSignReset = true,
     },
     .correctionGains = {
@@ -370,12 +383,47 @@ void opcontrol() {
     chassis.cancelAllMotions();  // an auton move cut off mid-run would otherwise keep fighting the sticks
     dr4b::target() = NAN;  // driver owns the lift, stops the auton hold loop writing to it
     dr4b::motors().set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);  // lift stays put when R1/R2 are released
+    // Lift stages. Up / Down pick the stage (shown on the controller), R2 sends the lift
+    // to it, R1 brings it back down to the pickup height. X / B still move it by hand.
+    const auto& stages = dr4b::driverStages();
+    const int lastStage = static_cast<int>(stages.size()) - 1;
+    int stage = 0, shownStage = -1;
+    bool goingDown = false;
+    std::uint32_t lastPrint = 0;
     while (true) {
-        // Lift, both towers together. R1 up, R2 down, slowing near the bottom stop and kTopDeg
-        const int liftCmd = controller.holding(Button::R1) ? 127 : controller.holding(Button::R2) ? -127 : 0;
-        const int liftOut = drive_mix::liftPower(liftCmd, dr4b::angle(), dr4b::kTopDeg);
-        if (liftOut == 0) dr4b::motors().brake();
-        else dr4b::motors().move(liftOut);
+        if (controller.pressed(Button::Up)) stage = std::min(stage + 1, lastStage);
+        if (controller.pressed(Button::Down)) stage = std::max(stage - 1, 0);
+        if (controller.pressed(Button::R2) && lastStage >= 0) {
+            dr4b::to(stages[stage]);
+            goingDown = false;
+        }
+        if (controller.pressed(Button::R1)) {
+            dr4b::to(dr4b::kLoader);
+            goingDown = true;
+        }
+        // Down and resting on the stop: let go, so the motors do not push into it all match
+        if (goingDown && dr4b::angle() < dr4b::kLoader + 1.5) {
+            dr4b::target() = NAN;
+            goingDown = false;
+        }
+        // Manual, both towers together. X up, B down, slowing near the bottom stop and kTopDeg.
+        // Touching either one takes the lift back from the macro.
+        const int liftCmd = controller.holding(Button::X) ? 127 : controller.holding(Button::B) ? -127 : 0;
+        if (liftCmd != 0) {
+            dr4b::target() = NAN;
+            goingDown = false;
+        }
+        if (std::isnan(dr4b::target())) {   // nobody is driving the lift to a target
+            const int liftOut = drive_mix::liftPower(liftCmd, dr4b::angle(), dr4b::kTopDeg);
+            if (liftOut == 0) dr4b::motors().brake();
+            else dr4b::motors().move(liftOut);
+        }
+        // The controller screen takes one line at a time, at most every 50 ms
+        if (stage != shownStage && pros::millis() - lastPrint > 60) {
+            controller.raw().print(0, 0, "Lift stage %d of %d   ", stage + 1, lastStage + 1);
+            shownStage = stage;
+            lastPrint = pros::millis();
+        }
 
         // Roller claw. L1 intake, L2 outtake, otherwise hold the grip
         if (controller.holding(Button::L1)) rclaw::intake();

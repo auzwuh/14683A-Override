@@ -2,11 +2,18 @@
 // Heading fusion for two inertial sensors. No PROS includes so
 // tests/imu_fusion_check.cpp can run it on a PC. The PROS side is include/dual_imu.hpp.
 //
-// How it works. Every update reads each sensor's raw rotation (deg, unwrapped) and
-// takes the CHANGE since the last update, times that sensor's scale. The fused
-// heading adds up the weighted average of those changes. Working in changes, not
-// absolute readings, means a sensor can drop out mid-run without the heading
-// jumping, because the other sensor just keeps adding its own changes.
+// How it works. Every update reads each sensor's raw rotation (deg, unwrapped), takes
+// the CHANGE since the last update times that sensor's scale, and adds it to that
+// sensor's own running total. The fused heading is the weighted average of the two
+// totals. A sensor can drop out mid-run without the heading jumping, because the
+// other one just keeps adding its own changes.
+//
+// Why totals and not the changes of one update. The two sensors sample at their own
+// moments. In a fast turn one of them can show no change in one update and a double
+// change in the next. Judging each update on its own ("which change looks right")
+// switched between the sensors in the middle of that and counted the rotation twice
+// or not at all, 2 to 4 deg per fast turn in the simulator. The average of the two
+// totals cannot lose or double anything.
 //
 // Rules
 //  - Only sensors that finished calibrating are used. One that was missing or
@@ -14,10 +21,13 @@
 //  - A sensor that stops reporting mid-run (unplugged, static shock, it starts
 //    recalibrating) is dropped for the rest of the run. When an IMU reconnects it
 //    recalibrates while the robot moves, so its readings can no longer be trusted.
-//  - Both sensors should agree within a small amount each update. If they do not,
-//    one has glitched. Keep the change closest to the last fused change (the robot
-//    cannot change turn rate that fast). A sensor that is the odd one out for
-//    kOutlierDropTicks updates in a row is dropped.
+//  - The two totals should stay close. A late sample pulls them apart by about one
+//    update of turning, and that is allowed. If they are further apart than that, one
+//    sensor has jumped. From then on the heading follows the sensor whose change
+//    looked normal, until they agree again.
+//  - If the jump was a one-off (both turn at the same rate again), the sensor that
+//    jumped rejoins after forgiveTicks updates with the jump left out.
+//  - If it keeps disagreeing for outlierDropTicks updates it is dropped.
 //  - No sensor left means no heading. Odometry then sees an invalid reading, the
 //    same as a single unplugged IMU.
 
@@ -35,11 +45,12 @@ struct Config {
     double scale[kCount] = {1.0, 1.0};
     // How much each sensor counts when both are working. Normalised, so {1, 1} is 50/50.
     double weight[kCount] = {1.0, 1.0};
-    // Allowed disagreement in one update: this many degrees, or this share of the
-    // change, whichever is bigger. Real sensors differ by about 0.01 deg per 10 ms
-    // update, so these only catch glitches.
+    // How far apart the two totals may be: this many degrees, or this many updates of
+    // turning at the current rate, whichever is bigger. One late sample is 1 update,
+    // a lost one is 2.
     double maxDisagreeDeg = 2.0;
-    double maxDisagreeFrac = 0.05;
+    double maxDisagreeFrac = 3.0;
+    int forgiveTicks = 3;       // a one-off jump is left out after this many updates
     int outlierDropTicks = 25;  // about 0.25 s of updates at 10 ms
 };
 
@@ -56,11 +67,12 @@ class Fuser {
     // valid now are used for this run.
     void restart(const Sample (&s)[kCount], double fusedDeg = 0.0) {
         fused_ = fusedDeg;
-        lastDelta_ = 0.0;
+        slowGap_ = agreedGap_ = lastTarget_ = normalDelta_ = 0.0;
+        streak_ = follow_ = 0;
         for (int i = 0; i < kCount; ++i) {
             inUse_[i] = s[i].valid && std::isfinite(s[i].rawDeg);
             last_[i] = s[i].rawDeg;
-            outlierStreak_[i] = 0;
+            total_[i] = 0.0;
         }
     }
 
@@ -76,20 +88,41 @@ class Fuser {
 
         double d = 0.0;
         if (inUse_[0] && inUse_[1]) {
-            const double gap = std::fabs(delta[0] - delta[1]);
+            const double w0 = std::max(0.0, config_.weight[0]), w1 = std::max(0.0, config_.weight[1]);
+            const double share1 = w0 + w1 > 0.0 ? w1 / (w0 + w1) : 0.5;
+            total_[0] += delta[0];
+            total_[1] += delta[1];
+            const double gap = total_[0] - total_[1];
+            const bool sameRate = std::fabs(delta[0] - delta[1]) <= config_.maxDisagreeDeg;
+            if (sameRate) normalDelta_ = delta[0] - share1 * (delta[0] - delta[1]);
             const double allowed = std::max(config_.maxDisagreeDeg,
-                                             config_.maxDisagreeFrac * std::max(std::fabs(delta[0]), std::fabs(delta[1])));
-            if (gap <= allowed) {
-                const double w0 = std::max(0.0, config_.weight[0]), w1 = std::max(0.0, config_.weight[1]);
-                d = w0 + w1 > 0.0 ? (w0 * delta[0] + w1 * delta[1]) / (w0 + w1) : 0.5 * (delta[0] + delta[1]);
-                outlierStreak_[0] = outlierStreak_[1] = 0;
+                                             config_.maxDisagreeFrac * std::min(std::fabs(delta[0]), std::fabs(delta[1])));
+            // slowGap_ follows the gap slowly, so drift and a small scale mismatch never count as a jump
+            if (std::fabs(gap - slowGap_) <= allowed) {
+                agreedGap_ = gap;
+                slowGap_ += 0.02 * (gap - slowGap_);
+                streak_ = 0;
             } else {
-                const int keep = std::fabs(delta[0] - lastDelta_) <= std::fabs(delta[1] - lastDelta_) ? 0 : 1;
-                const int odd = 1 - keep;
-                d = delta[keep];
-                outlierStreak_[keep] = 0;
-                if (++outlierStreak_[odd] >= config_.outlierDropTicks) inUse_[odd] = false;
+                // Pick who to follow once, when the disagreement starts, and stay with it.
+                if (streak_ == 0)
+                    follow_ = std::fabs(delta[0] - normalDelta_) <= std::fabs(delta[1] - normalDelta_) ? 0 : 1;
+                const int other = 1 - follow_;
+                ++streak_;
+                if (sameRate && streak_ >= config_.forgiveTicks) {
+                    total_[other] += (other == 1 ? 1.0 : -1.0) * (gap - agreedGap_);   // rejoin, jump left out
+                    slowGap_ = agreedGap_;
+                    streak_ = 0;
+                } else if (streak_ >= config_.outlierDropTicks) {
+                    inUse_[other] = false;
+                    agreedGap_ = slowGap_;   // take back what it added just before it was caught
+                }
             }
+            // While they agree this is the weighted average of the two totals. While they do
+            // not, it is that average as it last stood plus the followed sensor's turning since.
+            const double target = streak_ > 0 && follow_ == 1 ? total_[1] + (1.0 - share1) * agreedGap_
+                                                              : total_[0] - share1 * agreedGap_;
+            d = target - lastTarget_;
+            lastTarget_ = target;
         } else if (inUse_[0]) {
             d = delta[0];
         } else if (inUse_[1]) {
@@ -99,7 +132,6 @@ class Fuser {
         }
 
         fused_ += d;
-        lastDelta_ = d;
         return fused_;
     }
 
@@ -112,10 +144,15 @@ class Fuser {
   private:
     Config config_;
     double fused_ = 0.0;
-    double lastDelta_ = 0.0;
     double last_[kCount] = {0.0, 0.0};
+    double total_[kCount] = {0.0, 0.0};   // each sensor's own scaled rotation since restart
+    double slowGap_ = 0.0;      // total_[0] - total_[1], followed slowly
+    double agreedGap_ = 0.0;    // that gap at the last update the sensors agreed
+    double lastTarget_ = 0.0;
+    double normalDelta_ = 0.0;  // fused change at the last update both turned at the same rate
     bool inUse_[kCount] = {false, false};
-    int outlierStreak_[kCount] = {0, 0};
+    int streak_ = 0;            // updates in a row the totals have been too far apart
+    int follow_ = 0;            // sensor followed during that streak
 };
 
 }  // namespace imu_fusion

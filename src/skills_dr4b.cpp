@@ -20,12 +20,12 @@ void skillsDr4b() {
     skills::liftForGoal(dr4b::kShortGoal, 1);
     chassis.waitUntilDone();
     chassis.turnToPoint(23.40f, 46.80f, {.timeout = 674, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
-    skills::reachTo(23.40f, 46.80f, skills::goalStopIn(dr4b::kShortGoal, 1), 789);
+    skills::reachTo(23.40f, 46.80f, skills::goalStopIn(dr4b::kShortGoal, 1), 809);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 1);
     pros::delay(200);
-    chassis.moveToPoint(37.05f, 58.02f, {.timeout = 789, .forwards = false, .async = true});
-    chassis.waitUntil(2.94f);
+    chassis.moveToPoint(37.05f, 58.02f, {.timeout = 809, .forwards = false, .async = true});
+    chassis.waitUntil(3.09f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(57.82f, 46.80f, {.timeout = 780, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80, .forwards = false});
@@ -41,16 +41,18 @@ void skillsDr4b() {
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
     chassis.turnToPoint(23.40f, 46.80f, {.timeout = 850, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
-    skills::reachTo(23.40f, 46.80f, skills::goalStopIn(dr4b::kShortGoal, 2), 1414, true);
-    chassis.waitUntil(2.57f);
+    chassis.moveToPoint(37.63f, 46.80f, {.timeout = 1430, .async = true});
+    chassis.waitUntil(2.62f);
     skills::liftForGoal(dr4b::kShortGoal, 2);
     chassis.waitUntilDone();
+    dr4b::waitSettled(700);
+    skills::reachTo(23.40f, 46.80f, skills::goalStopIn(dr4b::kShortGoal, 2), 700);
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 2);
     pros::delay(200);
-    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1414, .forwards = false, .async = true});
-    chassis.waitUntil(9.00f);
+    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1430, .forwards = false, .async = true});
+    chassis.waitUntil(9.17f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(58.80f, 68.38f, {.timeout = 850, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
@@ -64,8 +66,8 @@ void skillsDr4b() {
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
     chassis.turnToPoint(23.40f, 46.80f, {.timeout = 850, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
-    chassis.moveToPoint(36.78f, 46.80f, {.timeout = 1459, .async = true});
-    chassis.waitUntil(2.70f);
+    chassis.moveToPoint(36.22f, 46.80f, {.timeout = 1477, .async = true});
+    chassis.waitUntil(2.76f);
     skills::liftForGoal(dr4b::kShortGoal, 2);
     chassis.waitUntilDone();
     dr4b::waitSettled(700);
@@ -74,8 +76,8 @@ void skillsDr4b() {
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 2);
     pros::delay(200);
-    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1459, .forwards = false, .async = true});
-    chassis.waitUntil(9.46f);
+    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1477, .forwards = false, .async = true});
+    chassis.waitUntil(9.66f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(58.80f, 68.38f, {.timeout = 850, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
@@ -89,8 +91,8 @@ void skillsDr4b() {
     dr4b::to(dr4b::kCarry);
     chassis.waitUntilDone();
     chassis.turnToPoint(23.40f, 46.80f, {.timeout = 850, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
-    chassis.moveToPoint(35.19f, 46.80f, {.timeout = 1512, .async = true});
-    chassis.waitUntil(2.86f);
+    chassis.moveToPoint(34.54f, 46.80f, {.timeout = 1533, .async = true});
+    chassis.waitUntil(2.93f);
     skills::liftForGoal(dr4b::kShortGoal, 2);
     chassis.waitUntilDone();
     dr4b::waitSettled(700);
@@ -99,8 +101,8 @@ void skillsDr4b() {
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 2);
     pros::delay(200);
-    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1512, .forwards = false, .async = true});
-    chassis.waitUntil(10.02f);
+    chassis.moveToPoint(57.82f, 46.80f, {.timeout = 1533, .forwards = false, .async = true});
+    chassis.waitUntil(10.25f);
     dr4b::to(dr4b::kLoader);
     chassis.waitUntilDone();
     chassis.turnToPoint(58.80f, 68.38f, {.timeout = 850, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
@@ -304,5 +306,5 @@ void skillsDr4b() {
     pros::delay(200);
     rclaw::hold();
 
-    // Estimated total time: 52.56 s
+    // Estimated total time: 52.64 s
 }

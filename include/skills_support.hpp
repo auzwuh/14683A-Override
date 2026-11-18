@@ -212,9 +212,11 @@ inline std::vector<std::pair<double, double>> kLiftTable = [] {
 inline double kL1In = 11.0, kL2In = 13.5;     // stage lengths, hole to hole (22 and 27 holes)
 inline double kStage1RestDir = -128.7;        // tower pivot to middle pivot, lift down on the 5.5 W motors
 inline double kStage2RestDir = -25.0;         // middle pivot to front pivot, lift down
-// Goal and object numbers (game object and Goal CAD, Tall Goal not known yet)
-inline double kGoalTopIn[3] = {3.25, 3.25, 8.77};  // top of the Goal base. Tall is from the ATTICUS field drawing, CHECK with a tape
-inline double kSeatIn[3] = {0.085, 0.085, 5.605};  // object bottom when seated in an empty Goal (top - 3.165 nest)
+// Goal and object numbers. Heights from Austin, 18 Nov: Short (neutral) Goals 146.5 mm = 5.77 in,
+// Tall (centre) Goal 222.7 mm = 8.77 in. Alliance Goal 3.25 in from the Goal CAD and the field
+// drawing. No Pins are in any Goal at the start.
+inline double kGoalTopIn[3] = {5.77, 3.25, 8.77};   // top of the Goal base: Short, Alliance, Tall
+inline double kSeatIn[3] = {2.605, 0.085, 5.605};   // object bottom when seated in an empty Goal (top - 3.165 nest)
 inline double kPitchIn = 3.32;                     // 6.49 tall, 3.165 nest. Check with a tape
 inline double kObjTallIn = 6.49;                   // height of one Pin or Cup standing alone
 inline double kUnitBelowPinIn = 0.0;   // both picked standing on the tiles at the same pose

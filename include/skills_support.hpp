@@ -231,6 +231,15 @@ inline double riseIn(double th) {
     };
     return z(th) - z(0.0);
 }
+// How far the claw has moved BACK toward the robot at lift angle th. Both stages swing on
+// arcs, so the higher the lift, the closer the robot has to stand to a Goal.
+inline double clawBackIn(double th) {
+    auto x = [](double t) {
+        return kL1In * std::cos((kStage1RestDir - t) * M_PI / 180.0) +
+               kL2In * std::cos((kStage2RestDir + t) * M_PI / 180.0);
+    };
+    return x(0.0) - x(th);
+}
 // Gravity load on the lift motors at lift angle a, as a share of the heaviest
 // angle. The load follows how far the claw rises per lift degree, which both
 // stages set (stage 1 rests 51 deg below level, stage 2 25, and L2 > L1), so the
@@ -891,6 +900,59 @@ inline void parkMidfield(float bx, float by, float vx, float vy, float px, float
     chassis.turnToPoint(px, py, {.timeout = 700});
     chassis.moveToPoint(px, py, {.timeout = 2500});
     rclaw::hold();
+}
+
+// Drive forward until the robot origin is reachIn from (x, y), along the line from where
+// the robot is NOW. Call it right after a turnToPoint at the same (x, y). The claw then
+// lands on that point even when the robot started a little off the planned line. A move
+// to a fixed stop point instead swings the claw about 0.8 in sideways for every inch the
+// start was off (the first Loader grab missed that way in the simulator).
+inline void reachTo(float x, float y, float reachIn, int timeoutMs, bool async = false) {
+    const arc::Pose p = chassis.getPose();
+    const float d = std::hypot(x - p.x, y - p.y);
+    const float k = d > reachIn ? (d - reachIn) / d : 0.0f;   // already inside reach: stay put
+    chassis.moveToPoint(p.x + (x - p.x) * k, p.y + (y - p.y) * k, {.timeout = timeoutMs, .async = async});
+}
+
+// ---- Placing on a Goal, from what is REALLY on it ----
+// The route used to release at heights and stops fixed in advance. After one failed grab every
+// later release on that Goal was a whole object too high. Now the robot counts what it has put
+// on each Goal and works out the lift height and the stop from that count when it gets there.
+// It can only know about grabs the claw sensor did not confirm. An object that was released
+// but missed the post still counts as placed.
+inline int onGoal[3] = {0, 0, 0};    // objects on the Short, Alliance and Tall Goal (dr4b::Goal order)
+inline bool holding = true;          // false after a grab the claw sensor did not confirm. The preload starts in the claw
+inline double kClawReachIn = 9.5;    // robot origin to the held object's centre, lift down (MEASURE). Same as S_LOAD_IN in gen_route.py
+inline double kPlaceCarryIn = 0.4;   // how far past the claw centre a released object lands, the rollers throw it forward.
+                                     // ASSUMED from the simulator. MEASURE: place 5 times, see how far past the post it lands
+inline double kGoalMinIn = 5.0;      // closest the origin may come to a Goal centre (4.72 seats the base in the notch)
+inline double kEmptyStopIn = 14.0;   // with nothing in the claw, stop this far out so the low claw stays off the stack
+
+inline void resetGoals() { onGoal[0] = onGoal[1] = onGoal[2] = 0; holding = true; }   // start of a run
+// Call with the result of every rclaw::confirmGrip(). With no sensor value yet it assumes the grab worked.
+inline void noteGrip(bool seen) {
+    holding = seen || std::isnan(rclaw::kSeesObjectMm);
+    if (!holding) std::printf("[t %5.2f] nothing in the claw, the next placement is skipped\n", elapsedMs() / 1000.0);
+}
+// units: 1 for a bare Pin, 2 for a Cup+Pin
+inline double goalAngle(dr4b::Goal g, int units) {
+    return dr4b::levelAngle(g, onGoal[g], units == 2 ? dr4b::kCupPin : dr4b::kPin);
+}
+inline void liftForGoal(dr4b::Goal g, int units) {
+    if (holding) dr4b::to(goalAngle(g, units));
+}
+// How far from the Goal centre the robot origin stops for this release
+inline float goalStopIn(dr4b::Goal g, int units) {
+    const double a = goalAngle(g, units);
+    if (!holding || std::isnan(a)) return static_cast<float>(kEmptyStopIn);
+    return static_cast<float>(std::max(kGoalMinIn, kClawReachIn + kPlaceCarryIn - dr4b::clawBackIn(a)));
+}
+inline void releaseOn(dr4b::Goal g, int units) {
+    if (!holding) return;
+    rclaw::release();
+    onGoal[g] += units;
+    holding = false;
+    std::printf("[t %5.2f] Goal %d now holds %d\n", elapsedMs() / 1000.0, static_cast<int>(g), onGoal[g]);
 }
 
 // Toggle visit, with the robot facing the wall and the front rails a few inches off it.

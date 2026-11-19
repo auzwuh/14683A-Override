@@ -63,22 +63,26 @@ namespace dr4b {
 // (kUseMotorEncoders) or from a rotation sensor on a stage 1 pivot.
 // NAN means not tuned, and dr4b::to() ignores NAN targets.
 inline bool kUseMotorEncoders = true;
-// 12T to 48T: 4 lift motor degrees per degree of lift (crank) angle. Austin's table: 80 motor deg = 20 deg.
+// 12T to 48T: 4 lift motor degrees per degree of CRANK angle. The lift angle follows the crank
+// through the string, see crankTurnForLift() below.
 inline double kMotorDegPerLiftDeg = 4.0;
 // LIFT LIMITS, in lift MOTOR degrees, zeroed with the lift resting on its stop. The driver
 // soft stops and every auton target stay inside them. From Austin's table: 412 is the top.
 inline double kBottomMotorDeg = 0.0, kTopMotorDeg = 412.0;
-// Austin's lift table: lift MOTOR degrees -> height (in) of the lift's front end above the tiles.
-// Goal levels are read off this table. Replace the rows with tape measurements when you have them.
-inline std::vector<std::pair<double, double>> kLiftMotorTable{
-    {0, 3.2}, {80, 11.5}, {160, 20.2}, {240, 28.3}, {320, 34.9}, {400, 39.3}, {412, 39.7}};
+// The 17 Nov height table (motor deg -> height: 0 3.2, 80 11.5, 160 20.2, 240 28.3, 320 34.9, 400 39.3,
+// 412 39.7 in) is no longer used. It was for the lift before the hard stop and the string. Goal
+// levels now come from the linkage and the string geometry below, or from a measured kLiftTable.
 inline double kLoader = 0.0;      // pickup at the rest pose, object standing on the tiles (ASSUMED)
 inline double kFloor = 0.0;       // same pickup pose for floor Cup+Pins (ASSUMED)
-inline double kCarry = 8.0;       // STARTING VALUE (32 motor deg). travel height with a held object. Keep it at 20 deg or less: higher, the back of
-                                  // the lift sticks out past the frame and hits the wall on the Loader lane turns
-inline double kPreRaise = 18.0;   // STARTING VALUE. Loader loads for a tall stack ride at this height from the Loader to the lane turn, so the
-                                  // lift has less left to do on the drive in and the robot does not have to stop and wait for it. Same 20 deg limit as kCarry
-inline double kToggleUp = 37.0;   // STARTING VALUE (148 motor deg, Pin bottom 15.7 in up, 1 in over the turning Toggle). claw and held Pin clear above the wall and Toggle while the paddle spins
+// The BACK OF THE LIFT decides these two (see rearIn() below). Folded, the rear end of the upper
+// stage 1 bar is 10.27 in behind the robot origin, 1.72 in past the frame. It swings further back as
+// the lift starts up (10.88 at 6 deg, 11.72 at 18, 12.0 at 33) and is over the wall top from 35 deg.
+// So next to a wall the lift is either LOW or above 35 deg, never in between.
+inline double kCarry = 4.0;       // STARTING VALUE. travel height with a held object, its bottom 2.2 in off the tiles. The lift's back
+                                  // corners are then 11.7 in from the origin, and the Loader lane turns are 12.4 in from the wall
+inline double kPreRaise = 4.0;    // STARTING VALUE. Was 18, a head start for tall stacks on the way out of the Loader. At 18 deg the
+                                  // lift's back corners now reach 12.5 in and scrape the wall on the Loader lane turn. Keep it at kCarry
+inline double kToggleUp = 38.4;   // STARTING VALUE (Pin bottom 15.7 in up, 1 in over the turning Toggle). claw and held Pin clear above the wall and Toggle while the paddle spins
                                   // (Toggle top 14.3 in up, 14.4 as it turns, paddle sweeps to 14.9 on the right)
 // Goal placements used by the skills route, in route order. Filled by
 // computeRouteTargets() from the stacking model below, do not type them in.
@@ -107,11 +111,46 @@ inline arc::MotorGroup& motors() {
     static arc::MotorGroup m({skills_ports::kLiftLeft, skills_ports::kLiftRight}, 200.0, 1.0);   // 200 rpm cartridges
     return m;
 }
+
+// ---- String drive (Austin's numbers, 19 Nov) ----
+// The 48T gear turns a crank arm. A string runs from the far hole of that arm to hole 27 on the
+// tail of the lower stage 1 bar, in front of the bar's tower pivot. Pulling the tail down raises
+// the lift. The lift rests on a hard stop with stage 1 at kStage1FoldedDeg.
+// So the lift angle is NOT motor degrees / 4. Right at the stop the crank turns 4.6 deg per lift
+// degree, mid stroke about 0.9, and over the whole stroke 105.6 deg of crank for 98 deg of lift.
+// A string only pulls: the motors raise the lift, gravity lowers it. While the string is slack
+// the motor encoders do not show where the lift is (a rotation sensor on the stage 1 pivot would).
+inline double kCrankFwdIn = 0.250, kCrankDownIn = 6.750;   // crank axle (48T centre) from the stage 1 tower pivot
+inline double kCrankArmIn = 2.061;                         // 48T centre to the string hole
+inline double kTieIn = 2.000;                              // bar's tower pivot to hole 27 (4 holes)
+inline double kStringIn = 5.918;                           // string, hole to hole, for the rest pose below
+inline double kStage1FoldedDeg = -33.0;                    // stage 1 above level, resting on the 4.35 in standoff on the crank axle
+// Crank arm angle (deg from straight forward, + up) with the string taut and stage 1 at aDeg above level.
+inline double crankForStage(double aDeg) {
+    const double a = aDeg * M_PI / 180.0;
+    const double dx = kTieIn * std::cos(a) - kCrankFwdIn, dy = -kTieIn * std::sin(a) + kCrankDownIn;
+    const double d = std::hypot(dx, dy);
+    const double c = std::clamp((kCrankArmIn * kCrankArmIn + d * d - kStringIn * kStringIn) / (2.0 * kCrankArmIn * d), -1.0, 1.0);
+    return (std::atan2(dy, dx) + std::acos(c)) * 180.0 / M_PI;
+}
+// Crank turn from the stop (deg) for a lift angle (stage 1 turn from the stop, deg), and back.
+inline double crankTurnForLift(double liftDeg) {
+    return crankForStage(kStage1FoldedDeg + liftDeg) - crankForStage(kStage1FoldedDeg);
+}
+inline double liftForCrankTurn(double crankDeg) {
+    double lo = 0.0, hi = 115.0;   // crankTurnForLift rises all the way through this range
+    if (crankDeg <= 0.0) return crankDeg / 4.6;   // below the stop only while taring, same slope as just above it
+    for (int i = 0; i < 40; ++i) {
+        const double m = 0.5 * (lo + hi);
+        (crankTurnForLift(m) < crankDeg ? lo : hi) = m;
+    }
+    return 0.5 * (lo + hi);
+}
 inline pros::Rotation& sensor() { static pros::Rotation r(skills_ports::kLiftRotation); return r; }
 // NAN when nothing can be read. An unplugged motor reports infinity and is left out, so the
 // other motor's encoder still gives the angle (both are on one shaft).
 inline double angle() {
-    if (kUseMotorEncoders) return lift_ctrl::meanFinite(motors().get_position_all()) / kMotorDegPerLiftDeg;
+    if (kUseMotorEncoders) return liftForCrankTurn(lift_ctrl::meanFinite(motors().get_position_all()) / kMotorDegPerLiftDeg);
     const std::int32_t c = sensor().get_position();
     return c == PROS_ERR ? NAN : c / 100.0;   // centidegrees -> deg
 }
@@ -161,7 +200,7 @@ inline void start() {
 inline void to(double deg) {
     if (std::isnan(deg)) { std::printf("[dr4b] target not tuned, ignored\n"); return; }
     start();
-    target() = std::clamp(deg, kBottomMotorDeg / kMotorDegPerLiftDeg, kTopMotorDeg / kMotorDegPerLiftDeg);   // never past the limits
+    target() = std::clamp(deg, liftForCrankTurn(kBottomMotorDeg / kMotorDegPerLiftDeg), liftForCrankTurn(kTopMotorDeg / kMotorDegPerLiftDeg));   // never past the limits
 }
 inline bool waitSettled(int timeoutMs) {
     if (std::isnan(target()) || std::isnan(kTolDeg)) return false;
@@ -193,22 +232,23 @@ inline bool waitSettled(int timeoutMs) {
 // (or the Goal base when empty) + claw underside + drop clearance.
 enum Goal { kShortGoal = 0, kAllianceGoal = 1, kTallGoal = 2 };
 enum Held { kPin = 0, kCupPin = 1 };
-// {lift angle deg, rise in}, built from kLiftMotorTable: angle = motor deg / 4, rise = height - height at rest
-inline std::vector<std::pair<double, double>> kLiftTable = [] {
-    std::vector<std::pair<double, double>> t;
-    for (const auto& [motorDeg, heightIn] : kLiftMotorTable)
-        t.push_back({motorDeg / kMotorDegPerLiftDeg, heightIn - kLiftMotorTable.front().second});
-    return t;
-}();
-// dr4b.step side view. Directions in deg, 0 = forward, 90 = up.
-// Final CAD, dr4b (2).step. The CAD pose is NOT the rest pose (stage 1 is drawn at
-// -130.0, 0.22 in above its stop). At rest the stage 1 lower bars sit on the two
-// 5.5 W Toggle motors, which gives -128.7. Stage 2 is drawn at -25.1, and its real
-// rest is somewhere from -24.3 to -26.4 (set by which 60T tooth is meshed), so
-// MEASURE both with an angle gauge on the robot, or fill kLiftTable instead.
+// {lift angle deg, rise in}, MEASURED on the robot. Empty = the linkage below is used.
+// It is empty since 19 Nov: the 17 Nov height table was made for a lift that rested 51 deg
+// below level and turned 1 to 1 with the crank. With the rest pose at -33 deg and the string
+// that table no longer fits. Fill this with 8
+// or so tape measurements once the lift is built: {lift angle from dr4b::angle(), rise of the
+// held Pin's bottom above its pickup height}.
+inline std::vector<std::pair<double, double>> kLiftTable = {};
+// Side view. Directions in deg, 0 = forward, 90 = up. CHECK both rest directions with an angle
+// gauge on the built robot, or fill kLiftTable instead.
 inline double kL1In = 11.0, kL2In = 13.5;     // stage lengths, hole to hole (22 and 27 holes)
-inline double kStage1RestDir = -128.7;        // tower pivot to middle pivot, lift down on the 5.5 W motors
-inline double kStage2RestDir = -25.0;         // middle pivot to front pivot, lift down
+// 19 Nov, Austin's CAD: the lift rests with stage 2's lower bars on the 4.35 in standoff on the
+// crank axle. Stage 1 is then 33 deg below level and stage 2 32.17 deg below level (the two are
+// 0.83 deg apart, re-meshed by 4 teeth). Lower carriage pivot above the tiles, with a = stage 1
+// above level: h = 17.395 + 11.0 sin(a) + 13.5 sin(a + 0.83). 4.22 in folded, 39.68 in at a = 65.
+// riseIn() and clawBackIn() below are that same linkage.
+inline double kStage1RestDir = -147.0;        // tower pivot to middle pivot, lift on its stop (= -180 - kStage1FoldedDeg, keep the two in step)
+inline double kStage2RestDir = -32.17;        // middle pivot to front pivot, lift on its stop
 // Goal and object numbers. Heights from Austin, 18 Nov: Short (neutral) Goals 146.5 mm = 5.77 in,
 // Tall (centre) Goal 222.7 mm = 8.77 in. Alliance Goal 3.25 in from the Goal CAD and the field
 // drawing. No Pins are in any Goal at the start.
@@ -220,7 +260,7 @@ inline double kUnitBelowPinIn = 0.0;   // both picked standing on the tiles at t
 inline double kClawBelowObjIn = 0.25;  // lowest claw part below the held object's bottom (ASSUMED)
 inline double kDropClearIn = 0.9;      // gap between the claw underside and the stack top / Goal base at release.
                                        // Must be more than the lift settle error (kTolDeg x about 0.45 in per deg)
-inline double kTopDeg = kTopMotorDeg / kMotorDegPerLiftDeg;   // 103 deg of lift angle = 412 motor deg (stage 2's bars meet near 105)
+inline double kTopDeg = liftForCrankTurn(kTopMotorDeg / kMotorDegPerLiftDeg);   // 95 deg of lift angle at 412 motor deg (the string's stroke ends at 422)
 
 // Rise of the held object's bottom above its pickup height at lift angle th.
 inline double riseIn(double th) {
@@ -239,13 +279,30 @@ inline double clawBackIn(double th) {
     };
     return x(0.0) - x(th);
 }
+// Back of the lift (Austin's CAD, 19 Nov): how far behind the robot origin the rear end of the
+// upper stage 1 bar is at lift angle th. Folded it is 10.27 in, 1.72 in past the frame (8.55), so
+// the LIFT touches a wall before the frame does. It grows to 12.0 in as stage 1 comes level.
+// Returns 0 once the stage 1 middle joint is above the wall top and the lift passes over the wall.
+inline double kTowerAheadIn = 0.487;    // stage 1 tower pivots ahead of the robot origin
+inline double kBarEndIn = 12.5;         // tower pivot to the rear end of the upper stage 1 bar (11.0 + 1.5 past the middle pivot)
+inline double kBarHalfIn = 0.5;         // half the height of that bar
+inline double kLowPivotUpIn = 11.875;   // lower stage 1 tower pivot above the tiles
+inline double kWallTopIn = 11.58;       // top of the field wall (field CAD, CHECK on a real field)
+inline double rearIn(double th) {
+    const double a = (kStage1FoldedDeg + th) * M_PI / 180.0;
+    if (kLowPivotUpIn + kL1In * std::sin(a) - kBarHalfIn >= kWallTopIn) return 0.0;
+    return kBarEndIn * std::cos(a) + kBarHalfIn * std::fabs(std::sin(a)) - kTowerAheadIn;
+}
 // Gravity load on the lift motors at lift angle a, as a share of the heaviest
 // angle. The load follows how far the claw rises per lift degree, which both
 // stages set (stage 1 rests 51 deg below level, stage 2 25, and L2 > L1), so the
 // peak is between where the two stages are level, not where stage 1 is level.
 // Assumes the claw end carries most of the weight.
 inline double gravityShare(double a) {
-    auto slope = [](double t) { return riseIn(t + 0.5) - riseIn(t - 0.5); };
+    // rise per degree of CRANK, which is what the motors feel through the string
+    auto slope = [](double t) {
+        return (riseIn(t + 0.5) - riseIn(t - 0.5)) / std::max(0.2, crankTurnForLift(t + 0.5) - crankTurnForLift(std::max(0.0, t - 0.5)));
+    };
     static const double peak = [&] {
         double m = 0.0;
         for (double t = 0.0; t <= 140.0; t += 1.0) m = std::max(m, slope(t));
@@ -561,9 +618,15 @@ class WallLocalizer {
     // wall squaring
     int kSquareMv = 3000;
     // Robot origin (traction axle) to the part that touches the wall (MEASURE). Final CAD: 6.50
-    // to the front rail ends, 8.55 at the back (1x1 angles on the frame; the lowered lift no
-    // longer sticks out behind). The front can NOT square at the Toggle, the spinner hits it first.
+    // to the front rail ends, 8.55 at the back of the FRAME (1x1 angles). The low lift sticks out
+    // past that, see backBumperIn(). The front can NOT square at the Toggle, the spinner hits it first.
     double kFrontBumperIn = 6.50, kBackBumperIn = 8.55;   // CAD values, CHECK with a tape
+    // What touches a wall behind the robot right now: the frame, or the back of the lift while it
+    // is low (10.27 in folded, 10.88 at kCarry). NAN when kBackBumperIn or the lift angle is.
+    double backBumperIn() const {
+        const double lift = dr4b::rearIn(dr4b::angle());
+        return std::isnan(lift) ? NAN : std::max(kBackBumperIn, lift);
+    }
     // After the push the IMU heading must be this close to the wall heading, or the
     // robot hit the wall at an angle (or is lost) and nothing is snapped. The IMU is
     // the only judge, so a square robot whose IMU is itself further off than this is
@@ -633,7 +696,7 @@ class WallLocalizer {
             return;
         }
         double x = p.x, y = p.y;
-        const double bumper = backwards ? kBackBumperIn : kFrontBumperIn;
+        const double bumper = backwards ? backBumperIn() : kFrontBumperIn;
         // direction the bumper faces (toward the wall)
         const double wallDir = std::fmod(wallHeadingDeg + (backwards ? 180.0 : 0.0), 360.0);
         const int k = static_cast<int>(std::lround(wallDir / 90.0)) & 3;
@@ -1008,7 +1071,8 @@ inline void aimAt(float x, float y, double tolDeg = kAimTolDeg) {
 inline int onGoal[4] = {0, 0, 0, 0}; // objects on the Short, Alliance and Tall Goal (dr4b::Goal order), then slot 3:
                                      // the second red Alliance Goal (48,24). A slot of -1 below means the Goal's own.
 inline bool holding = true;          // false after a grab the claw sensor did not confirm. The preload starts in the claw
-inline double kClawReachIn = 9.5;    // robot origin to the held object's centre, lift down (MEASURE). Same as S_LOAD_IN in gen_route.py
+inline double kClawReachIn = 6.5;    // robot origin to the held object's centre, lift down. DERIVED from the CAD carriage (front face 3.42 in
+                                     // ahead of the origin), the claw is not in the CAD. MEASURE. Same as S_LOAD_IN in gen_route.py
 inline double kPlaceCarryIn = 0.4;   // how far past the claw centre a released object lands, the rollers throw it forward.
                                      // ASSUMED from the simulator. MEASURE: place 5 times, see how far past the post it lands
 inline double kGoalMinIn = 5.0;      // closest the origin may come to a Goal centre (4.72 seats the base in the notch)

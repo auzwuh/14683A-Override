@@ -86,7 +86,6 @@ void applyRobotConstants() {
     if (opt.liftKp >= 0) {   // --lift-gains kP,kD,kI[,kG scale]
         dr4b::kP = opt.liftKp; dr4b::kD = opt.liftKd; dr4b::kI = opt.liftKi; dr4b::kG *= opt.liftKgScale;
     }
-    dr4b::kCarry = 8.0;
     // kToggleUp = "claw and held Pin clear above the wall and Toggle while the paddle spins". A team raises the lift
     // until the claw clears the turning Toggle by about an inch, so it is solved on THIS seed's lift: the encoder angle
     // (arm angle + slop) that puts the claw underside (0.25 in below the held Pin) kToggleClearIn over the top of the

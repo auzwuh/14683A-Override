@@ -122,6 +122,7 @@ void robotLine(const std::string& task, const std::string& s) {
 }
 void logRumble(const char* p) { logLine(std::string("[rumble] \"") + (p ? p : "") + "\""); }
 
+namespace { double liftRearIn(bool forWall); }
 // ================================================================ lift geometry (truth)
 static double zIn(double deg) {
     return kL1In * std::sin(d2r(truth.rest1Deg - deg)) + kL2In * std::sin(d2r(truth.rest2Deg + deg));
@@ -131,14 +132,25 @@ static double xIn(double deg) {
 }
 // TRUE rise: the owner's table, plus this seed's linkage error (the difference between this seed's
 // linkage and the nominal one), so seeds still differ a little.
-static double tableRiseIn(double deg) {
-    const int n = static_cast<int>(sizeof(kLiftTableDeg) / sizeof(kLiftTableDeg[0]));
-    int i = 0;
-    while (i < n - 2 && deg > kLiftTableDeg[i + 1]) ++i;
-    const double f = (deg - kLiftTableDeg[i]) / (kLiftTableDeg[i + 1] - kLiftTableDeg[i]);   // extrapolates past both ends
-    return kLiftTableIn[i] + f * (kLiftTableIn[i + 1] - kLiftTableIn[i]);
-}
+// 19 Nov: the owner's table was for the lift before the hard stop and the string, so the TRUE
+// rise is the linkage again (nominal plus this seed's error).
 static double zNomIn(double deg) { return kL1In * std::sin(d2r(kRest1Deg - deg)) + kL2In * std::sin(d2r(kRest2Deg + deg)); }
+static double tableRiseIn(double deg) { return zNomIn(deg) - zNomIn(0.0); }
+// String drive: crank turn (deg, from the stop) that holds the lift at lift angle deg, and how
+// many crank degrees one lift degree takes there. Treated as a rigid link: the string going
+// slack on the way down (motors faster than the falling lift) is NOT modelled.
+static double crankForStageDeg(double aDeg) {
+    const double a = d2r(aDeg);
+    const double dx = kTieIn * std::cos(a) - kCrankFwdIn, dy = -kTieIn * std::sin(a) + kCrankDownIn;
+    const double d = std::hypot(dx, dy);
+    const double c = std::max(-1.0, std::min(1.0, (kCrankArmIn * kCrankArmIn + d * d - kStringIn * kStringIn) / (2.0 * kCrankArmIn * d)));
+    return r2d(std::atan2(dy, dx) + std::acos(c));
+}
+static double crankTurnDeg(double liftDeg) { return crankForStageDeg(kStage1FoldedDeg + liftDeg) - crankForStageDeg(kStage1FoldedDeg); }
+static double stringRatio(double liftDeg) {
+    const double lo = std::max(0.0, liftDeg - 0.5);
+    return std::max(0.3, (crankTurnDeg(lo + 1.0) - crankTurnDeg(lo)) / 1.0);
+}
 double liftRiseIn(double deg) { return tableRiseIn(deg) + (zIn(deg) - zIn(0.0)) - (zNomIn(deg) - zNomIn(0.0)); }
 double liftDxIn(double deg) { return xIn(deg) - xIn(0.0); }
 // Torque at the lift shaft (N m) that gravity, less the bands, puts on the lift at TRUE angle deg.
@@ -472,7 +484,8 @@ void worldInit() {
     // the true origin (traction axle) kAxleFwdIn further: 8.55 in with the CAD numbers, the route's (37.05, 61.65).
     const double th = 180.0 + unif(-kStartDeg, kStartDeg);
     const double sd = std::fabs(std::sin(d2r(th)));
-    const double cy = kHalf - truth.rearIn * std::fabs(std::cos(d2r(th))) - kHalfWidthIn * sd - 0.01 - (opt.noise ? unif(0, kStartGapIn) : 0.0);
+    const double cs = std::fabs(std::cos(d2r(th))), lr = liftRearIn(true);   // the folded lift is behind the frame
+    const double cy = kHalf - std::max(truth.rearIn * cs + kHalfWidthIn * sd, lr * cs + kLiftHalfWIn * sd) - 0.01 - (opt.noise ? unif(0, kStartGapIn) : 0.0);
     body.x = 37.05 + unif(-kStartXYIn, kStartXYIn);
     body.y = cy + kAxleFwdIn * std::cos(d2r(th));
     body.th = d2r(th);
@@ -606,22 +619,33 @@ void boxContact(Wrench& w, double cx, double cy, double r, double f0, double f1,
     const double ny = -(std::cos(body.th) * nf - std::sin(body.th) * nr);
     applyPoint(w, px, py, nx, ny, pen);
 }
-void circleContact(Wrench& w, double cx, double cy, double r, double slack = 0.0) {
-    boxContact(w, cx, cy, r, -truth.rearIn, kFrontIn, 0.0, kHalfWidthIn, slack);
-}
-// A Goal base meets the frame behind the notch and the two drive rails beside it, not a solid front.
-void goalContact(Wrench& w, double gx, double gy) {
+// The FRAME as loose things meet it: the body behind the notch and the two front drive rails. Between the rails the
+// front is open (the plate there has the V notch). A Goal base slides in there, and since the 19 Nov lift the claw holds
+// its object there too (6.5 in ahead of the axle, level with the rail ends), so Cups and the Loader chute go in as well.
+// ASSUMED for the chute: 4.84 in wide against an 8.4 in gap, nothing above the plate in its way.
+double frameBoxPen(double cf, double cr, double r, double& nf, double& nr) {
     const double railHw = 0.5 * (kHalfWidthIn - kNotchHalfWIn), railC = kNotchHalfWIn + railHw;
-    boxContact(w, gx, gy, kGoalR, -truth.rearIn, kNotchFlatIn, 0.0, kHalfWidthIn);
-    boxContact(w, gx, gy, kGoalR, kNotchFlatIn, kFrontIn, railC, railHw);
-    boxContact(w, gx, gy, kGoalR, kNotchFlatIn, kFrontIn, -railC, railHw);
+    double best = boxPen(cf, cr, r, -truth.rearIn, kNotchFlatIn, kHalfWidthIn, nf, nr);
+    for (double c : {railC, -railC}) {
+        double f = 0, sd = 0;
+        const double pen = boxPen(cf, cr - c, r, kNotchFlatIn, kFrontIn, railHw, f, sd);
+        if (pen > best) { best = pen; nf = f; nr = sd; }
+    }
+    return best;
 }
+void circleContact(Wrench& w, double cx, double cy, double r, double slack = 0.0) {
+    const double railHw = 0.5 * (kHalfWidthIn - kNotchHalfWIn), railC = kNotchHalfWIn + railHw;
+    boxContact(w, cx, cy, r, -truth.rearIn, kNotchFlatIn, 0.0, kHalfWidthIn, slack);
+    boxContact(w, cx, cy, r, kNotchFlatIn, kFrontIn, railC, railHw, slack);
+    boxContact(w, cx, cy, r, kNotchFlatIn, kFrontIn, -railC, railHw, slack);
+}
+void goalContact(Wrench& w, double gx, double gy) { circleContact(w, gx, gy, kGoalR); }
 // Rear-most part: the frame, or the raised lift's middle link swinging out behind it (final CAD). For a wall the
 // link only counts while it is still below the wall top (stage 1 short of level).
 double liftRearIn(bool forWall) {
-    const double dir = d2r(truth.rest1Deg) - lift.a;
-    if (forWall && kTowerPivotUpIn + kL1In * std::sin(dir) - 0.5 >= kWallHeightIn) return truth.rearIn;
-    return std::max(truth.rearIn, -(kTowerPivotFwdIn + kL1In * std::cos(dir)) + kMidLinkBehindIn);
+    const double a = d2r(-180.0 - truth.rest1Deg) + lift.a;   // stage 1 above level
+    if (forWall && kTowerPivotUpIn + kL1In * std::sin(a) - kBarHalfIn >= kWallHeightIn) return truth.rearIn;
+    return std::max(truth.rearIn, kBarEndIn * std::cos(a) + kBarHalfIn * std::fabs(std::sin(a)) - kTowerPivotFwdIn);
 }
 double clawReach();
 // The near edge of the Toggle prism, as a y coordinate (0.06 in beyond the red wall's inner face)
@@ -637,12 +661,18 @@ Wrench contacts() {
         if (px < -kHalf) applyPoint(w, px, py, 1, 0, -kHalf - px);
         return w.fx * w.fx + w.fy * w.fy != f0;
     };
+    static long calls = 0;
+    ++calls;
     const double lr = liftRearIn(true);
     const double cf[6] = {kFrontIn, kFrontIn, -truth.rearIn, -truth.rearIn, -lr, -lr};
     const double cr[6] = {kHalfWidthIn, -kHalfWidthIn, kHalfWidthIn, -kHalfWidthIn, kLiftHalfWIn, -kLiftHalfWIn};
     for (int i = 0; i < (lr > truth.rearIn ? 6 : 4); ++i) {
         double px, py; robotToWorld(cf[i], cr[i], px, py);
-        walls(px, py);
+        if (walls(px, py) && i >= 4) {   // the back of the low lift on a wall: expected at the start and in a back square only
+            static long last = -100000;
+            if (calls - last > 300) logLine(fmt("[liftwall] the back of the lift touches a wall, lift %.1f deg, %.2f in behind the frame centre", r2d(lift.a), lr));
+            last = calls;
+        }
     }
     // Final CAD: the chain on the 18T and the tower plates stand ahead of the front rails at Toggle height (right side
     // only) and meet the Toggle's near edge before the rails meet the wall, so inside the Toggle's span the rails stop
@@ -703,7 +733,7 @@ double clawReach() { return kClawReachIn + liftDxIn(r2d(lift.a)) + sway; }
 double framePen(double x, double y, double r) {
     double cf, cr, nf, nr;
     worldToRobot(x, y, cf, cr);
-    return boxPen(cf, cr, r, -truth.rearIn, kFrontIn, kHalfWidthIn, nf, nr);
+    return frameBoxPen(cf, cr, r, nf, nr);
 }
 // A disc squeezed between a Goal base and the frame pops out sideways: round the base to the nearest spot clear of the frame.
 void slideRoundGoal(double gx, double gy, double need, double r, double& x, double& y) {
@@ -727,7 +757,7 @@ void looseStep() {
             double m = 0;
             for (int k = 0; k < 2; ++k) {
                 if (k == 1 && rise - 0.25 >= l.h) break;
-                const double pen = k == 0 ? boxPen(cf, cr, l.r, -truth.rearIn, kFrontIn, kHalfWidthIn, nf, nr)
+                const double pen = k == 0 ? frameBoxPen(cf, cr, l.r, nf, nr)
                                           : boxPen(cf, cr, l.r, -truth.rearIn, clawReach() + 1.0, kClawHalfWIn, nf, nr);
                 if (pen <= 0) continue;
                 cf += nf * pen; cr += nr * pen; m += pen;
@@ -911,7 +941,7 @@ static void addDebris(const Obj& o, const char* how) {
     {   // it cannot lie inside the robot frame (see framePen)
         double cf, cr, nf, nr;
         worldToRobot(x, y, cf, cr);
-        const double pen = boxPen(cf, cr, kCupR, -truth.rearIn, kFrontIn, kHalfWidthIn, nf, nr);
+        const double pen = frameBoxPen(cf, cr, kCupR, nf, nr);
         if (pen > 0) robotToWorld(cf + nf * pen, cr + nr * pen, x, y);
     }
     for (const auto& g : goals) {   // nor inside a Goal base
@@ -1072,7 +1102,7 @@ static void objectsStep(uint64_t t) {
         // the frame itself running into a standing object knocks it over
         double of, orr, nf, nr;
         worldToRobot(o.x, o.y, of, orr);
-        if (boxPen(of, orr, kCupR, -truth.rearIn, kFrontIn, kHalfWidthIn, nf, nr) > 0.3) { tip(o, "the robot frame"); continue; }
+        if (frameBoxPen(of, orr, kCupR, nf, nr) > 0.3) { tip(o, "the robot frame"); continue; }
         const double along = (o.x - cx) * fx + (o.y - cy) * fy;
         const double lat = (o.x - cx) * rx + (o.y - cy) * ry;
         if (std::fabs(lat) > truth.grabLatIn) {
@@ -1211,9 +1241,10 @@ void worldStep(uint64_t t) {
         for (int p = 0; p < 32; ++p) {
             MotorDev& m = motor(p);
             if (!m.exists || m.mech != 3) continue;
-            const double wm = m.mount * lift.w * kCrank;
-            Tm += m.mount * geared(motorTorque(m, wm), wm) * kCrank;
-            fr += motorFric(m) * kCrank;
+            const double kr = kCrank * stringRatio(deg);   // motor turns per lift turn here, through the string
+            const double wm = m.mount * lift.w * kr;
+            Tm += m.mount * geared(motorTorque(m, wm), wm) * kr;
+            fr += motorFric(m) * kr;
         }
         const double Jl = mass * (dz * dz + dx * dx) + truth.midKg * (kL1In * IN) * (kL1In * IN) + kLiftArmsInertia;
         const double net = Tm - liftLoadNm(deg, objKg);
@@ -1246,8 +1277,8 @@ void worldStep(uint64_t t) {
         else if (m.mech == 3) {
             // gear slop: free while the lift rests on its stop (where it is tared), taken up over the
             // first half degree of travel, so under load the motor is ahead of the arm by the slop
-            m.vel = m.mount * lift.w * kCrank;
-            m.pos = m.mount * (lift.a + d2r(truth.liftSlopDeg) * std::min(1.0, lift.a / d2r(0.5))) * kCrank;
+            m.vel = m.mount * lift.w * kCrank * stringRatio(r2d(lift.a));
+            m.pos = m.mount * d2r(crankTurnDeg(r2d(lift.a)) + truth.liftSlopDeg * std::min(1.0, lift.a / d2r(0.5))) * kCrank;
             continue;
         } else if (m.mech == 5) m.vel = m.mount * paddle.w * kPaddleRatio;
         m.pos += m.vel * dt;

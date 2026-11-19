@@ -42,6 +42,8 @@ inline double kOutIn = 3.5;         // how far off the wall the robot turns. The
                                     // claw and preload (11 in out) stay clear of the Goal next to the skills start
 inline int kDriveMv = 4000;         // creep off the wall. A 3 in move is too short for the drive PID
 inline int kSquareMinMs = 350, kSquareMaxMs = 2500;   // back square push: until the robot has stopped moving and turning
+inline double kLiftDeg = 45.0;       // lift angle while calibrating: its back end is then 2 in above the wall top
+inline double kLiftClearIn = 6.0;    // pull this far off the wall before the lift goes up or down
 inline int kTurns = 2;              // full turns for the IMU scale. 2 is enough: the squares are good to 0.3 deg in 720
 inline double kMaxBiasIn = 1.5;     // a bias bigger than this means something else was in the beam
 inline double kFlatIn = 0.25;       // after a square the tracking wheel must be within this of where the first square left it
@@ -176,13 +178,20 @@ inline void brakeMode(bool on) {
 // The whole routine. Returns true when every value came out inside its limits. When it returns
 // false nothing was saved, and whatever could not be measured keeps the value it had before.
 inline bool run() {
-    const double back = localizer.kBackBumperIn;
+    const double back = localizer.kBackBumperIn;   // every square in here is on the FRAME: the lift is raised over the wall first
     if (std::isnan(back)) { std::printf("[cal] kBackBumperIn is not set\n"); return false; }
     std::printf("[cal] start\n");
     const double oldScale[2] = {imuScale[0], imuScale[1]};
     for (int i = 0; i < 2; ++i) imu.setScale(i, 1.0);   // measure the raw sensors
     detail::brakeMode(true);
+    auto liftDown = [&] {
+        detail::driveOut(chassis.getPose().y + kLiftClearIn);
+        dr4b::to(dr4b::kLoader);
+        dr4b::waitSettled(2500);
+        dr4b::target() = NAN;   // back to the driver
+    };
     auto fail = [&](const char* why) {
+        liftDown();
         std::printf("[cal] FAILED, %s. Nothing saved\n", why);
         imuScale[0] = oldScale[0];
         imuScale[1] = oldScale[1];
@@ -192,6 +201,14 @@ inline bool run() {
         pros::c::controller_rumble(pros::E_CONTROLLER_MASTER, "---");
         return false;
     };
+    // The folded lift sticks out 1.7 in past the back of the frame and its end is only 8.5 in wide (the
+    // frame is 13.6). Pushed on that, a skewed robot does not turn flat: simulated, 1 run in 8 was refused
+    // and the others measured worse. So pull off the wall, raise the lift until its back end is above the
+    // wall top, and every square below is on the frame. On the way down the back of the lift swings out
+    // to 12 in behind the origin, so liftDown() pulls off the wall first.
+    detail::driveOut(chassis.getPose().y + kLiftClearIn);
+    dr4b::to(kLiftDeg);
+    if (!dr4b::waitSettled(2500) || !(dr4b::rearIn(dr4b::angle()) == 0.0)) return fail("the lift did not get above the wall top");
     // Square on the wall and call that spot heading 0 (facing away from the wall), y = back.
     // flat: after a push, the tracking wheel has to be back where the first square left it. A robot
     // jammed on one corner stops short (0.6 in at 5 deg), and its turn count would be wrong.
@@ -264,6 +281,8 @@ inline bool run() {
         chassis.turnToHeading(0, {.timeout = 1500});
         if (!squareHome(false)) ok = false;   // also leaves the robot where it started
     }
+    liftDown();
+    detail::square();   // back on the wall with the lift folded, as it started
     localizer.pauseContinuous(false);
     detail::brakeMode(false);
 

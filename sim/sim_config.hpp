@@ -17,7 +17,7 @@
 // | dr4b::kP                   | 0.8 V/deg       | settles inside 1.5 deg, under 0.5 deg overshoot        |
 // | dr4b::kD                   | 0.012 V/(deg/s) | trims overshoot; back-EMF supplies most damping        |
 // | dr4b::kTolDeg              | 1.5 deg         | 0.67 in at the peak slope vs 0.4 in drop clearance     |
-// | dr4b::kCarry               | 8 deg           | object bottom 3.1 in up                                |
+// | dr4b::kCarry               | 4 deg (header)  | object bottom 1.5 in up, lift's back corners 11.5 in out |
 // | dr4b::kToggleUp            | about 40 deg    | TRUE rise 15.68 in: the claw underside (0.25 in below  |
 // |                            |                 | the held Pin) is 1.0 in over the top of the turning    |
 // |                            |                 | Toggle, 14.43 in. Solved on each seed's own lift, the  |
@@ -30,8 +30,8 @@
 // | localizer.mounts[i].biasIn | calibrated      | printReadings procedure, parked 6.0 in from a wall:    |
 // |                            |                 | true distance minus median reading (0 with --no-noise) |
 // | localizer.kFrontBumperIn   | 6.50 in         | robot origin (traction axle) to the front rail ends    |
-// | localizer.kBackBumperIn    | 8.55 in         | robot origin to the back of the frame, and what the    |
-// |                            |                 | ROUTE's start pose assumes (70.205 - 61.65)            |
+// | localizer.kBackBumperIn    | 8.55 in         | robot origin to the back of the frame. A low lift      |
+// |                            |                 | touches first: backBumperIn(), 10.27 in folded         |
 // | WallLocalizer::kCloseMv .. | NOT filled      | 3000 / 1800 mV and 0.10 in lead, as the code has them  |
 // Left as the code has them: kGoalTopIn/kSeatIn Short+Alliance (3.25 / 0.085), kHoldMv 0,
 // kReleaseMs 300, kLoader 0, kFloor 0, kUnitBelowPinIn 0, kClawBelowObjIn 0.25,
@@ -98,11 +98,14 @@ constexpr double kScrubLo = 0.25, kScrubHi = 2.0;
 constexpr double kFrontIn = 8.0;        // frame centre to front rail end (final CAD 7.999) = 6.50 ahead of the traction axle
 constexpr double kRearIn = 7.05;        // frame centre to rearmost part, lift DOWN: the 1x1 angles on the back of the frame
                                         // (final CAD 7.047; was 8.4, the old lift overhang) = 8.55 behind the axle. --rear IN
-constexpr double kRouteRearIn = 7.05;   // what the route's start pose assumes (wall 70.205 - start y 61.65 = 8.55 from the axle)
+constexpr double kRouteRearIn = 7.05;   // the FRAME as the robot code has it (kBackBumperIn 8.55 from the axle). The low lift is in dr4b::rearIn()
 // The raised lift does overhang the back: the middle link swings out behind the frame (final CAD: tower pivot 1.987 in
 // ahead of the track centre, link edge 1.35 in behind the middle pivot: 6.43 behind in the CAD pose). Used for walls and
 // the Midfield only; it passes over Goals and Cups. 7.37 at kCarry (8 deg), 10.3 with stage 1 level (51 deg).
 constexpr double kTowerPivotFwdIn = 1.987, kTowerPivotUpIn = 11.875, kMidLinkBehindIn = 1.35, kLiftHalfWIn = 4.25;
+// 19 Nov CAD: the rearmost part is the rear end of the upper stage 1 bar, 12.5 in from the tower pivot, bar 1 in high.
+// 8.77 behind the frame centre folded (10.27 from the axle), 10.5 with stage 1 level, over the wall top from there.
+constexpr double kBarEndIn = 12.5, kBarHalfIn = 0.5;
 // Body origin and turning centre. Final CAD (same in the old one): the two traction wheels are 1.499 in AHEAD of the
 // frame centre (omnis at +-5.0). The TRUE pose is the middle of that axle (kAxleFwdIn, geometry). The traction wheels
 // are the only wheels that hold the robot sideways, so sideways friction acts at kPivotFwdIn ahead of the frame centre:
@@ -174,7 +177,7 @@ constexpr double kDistCalIn = 6.0;                              // biasIn calibr
 // Rest directions: stage 1 -128.7 with its lower bars sitting on the two 5.5 W motors (CAD range -129.75, if the Brain
 // stops it first, to -128.7); stage 2 is NOT fixed by the CAD (-26.4 to -24.3, which 60T tooth is meshed), -25.0 is the
 // code's value. Truth is these +-kLiftAngleErrDeg per seed (each stage), which covers both ranges. --lift-err DEG shifts both.
-constexpr double kL1In = 11.0, kL2In = 13.5, kRest1Deg = -128.7, kRest2Deg = -25.0;
+constexpr double kL1In = 11.0, kL2In = 13.5, kRest1Deg = -147.0, kRest2Deg = -32.17;   // 19 Nov CAD: on the crank axle standoff, stage 1 33 deg below level, stage 2 32.17
 constexpr double kLiftAngleErrDeg = 2.0;
 constexpr double kCrank = 4.0;              // motor deg per lift deg (12T -> 48T)
 constexpr double kCarriageKg = 1.02;        // claw + rollers + half of stage 2, at the claw end. ASSUMED, +-10 % per seed
@@ -196,7 +199,10 @@ constexpr double kLiftSlopDeg = 1.0;        // ASSUMED droop of the loaded lift 
                                             // backlash is free at tare). 1 deg is about 0.4 in at the claw. 0 to 2 deg per
                                             // seed, --lift-slop DEG
 constexpr double kKgTuneErr = 0.15;         // kG is "raise the volts until it holds": +- this share per seed
-constexpr double kLiftTopDeg = 105.0;       // mechanical top stop. Final CAD, low confidence: stage 2's own bars meet at about
+// String drive (Austin, 19 Nov), same numbers as dr4b:: in skills_support.hpp: crank axle from the stage 1 tower pivot,
+// crank arm, tie hole from the pivot, string length, stage 1 angle on the stop.
+constexpr double kCrankFwdIn = 0.250, kCrankDownIn = 6.750, kCrankArmIn = 2.061, kTieIn = 2.000, kStringIn = 5.918, kStage1FoldedDeg = -33.0;
+constexpr double kLiftTopDeg = 98.0;   // was 105.0 before the string: the stroke ends with stage 1 65 deg above level       // mechanical top stop. Final CAD, low confidence: stage 2's own bars meet at about
                                             // 105 deg (was 124, assumed). The code's kTopDeg is 100
 constexpr double kSwayHz = 3.0, kSwayZeta = 0.15, kSwayFullRiseIn = 30.0;   // ASSUMED fore-aft sway of the raised claw
                                             // under chassis acceleration (1 mode, deflection grows with lift height)
@@ -229,7 +235,7 @@ constexpr double kToggleClearIn = 1.0;           // how far over that the claw u
 
 // ---- roller claw
 constexpr double kRollerInertia = 0.0008;   // kg m^2 at the motor output
-constexpr double kClawReachIn = 11.0;       // frame centre to held-object centre, lift at rest = 9.5 ahead of the axle (route S_LOAD).
+constexpr double kClawReachIn = 8.0;        // frame centre to held-object centre, lift at rest = 6.5 ahead of the axle (derived from the CAD carriage).
                                             // The claw is not in the CAD: kept where the route expects it
 constexpr double kClawHalfWIn = 2.6;        // claw body half width (pushes loose and standing objects)
 constexpr double kRollerThickIn = 0.25;     // ASSUMED roller / side plate thickness inside that

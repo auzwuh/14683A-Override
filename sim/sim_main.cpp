@@ -71,7 +71,7 @@ void applyWiring() {
     wiring.toggle[0] = std::abs(skills_ports::kToggleLeft); wiring.toggle[1] = std::abs(skills_ports::kToggleRight);
     wiring.claw = skills_ports::kClawRollers;
     wiring.rot = verticalEncoder.get_port();
-    wiring.imu[0] = 20; wiring.imu[1] = 19;   // main.cpp kImuPortA / kImuPortB (file-local constants there)
+    wiring.imu[0] = 10; wiring.imu[1] = 20;   // main.cpp kImuPortA / kImuPortB (file-local constants there)
     wiring.dist[0] = skills_ports::kDistFront; wiring.dist[1] = skills_ports::kDistLeft;
     wiring.dist[2] = skills_ports::kDistRight; wiring.dist[3] = skills_ports::kClawSensor;
 }

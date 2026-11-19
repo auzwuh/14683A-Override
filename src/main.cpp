@@ -27,33 +27,33 @@ arc::Controller controller(arc::Controller::DriveMode::Arcade2Stick, 3, 10.0, fa
 arc::MotorGroup leftDrive({-4, 2}, 600.0, 1.33);
 arc::MotorGroup rightDrive({11, -12}, 600.0, 1.33);
 
-arc::MotorGroup clawRot({5}, 200.0, 0.25);    
 // pros::Rotation horizontalEncoder(-15);
 pros::Rotation verticalEncoder(-16);  
 
-// Lift, claw, Toggle and sensor ports. Negative = reversed. ALL PLACEHOLDERS until the robot is
-// wired: replace each with the real port. Already taken above and below: 2 4 5 11 12 16 19 20.
+// Lift, claw, Toggle and sensor ports. Negative = reversed. Lines marked PLACEHOLDER are not
+// wired yet: replace each with the real port. Taken so far: 2 4 5 7 9 10 11 12 14 16 17 19 20.
 // The devices themselves are created in skills_support.hpp from these numbers.
 namespace skills_ports {
-extern const int kLiftLeft = 3;       // PLACEHOLDER  DR4B motor, left tower
-extern const int kLiftRight = -6;     // PLACEHOLDER  DR4B motor, right tower. The two are mirrored on one shaft, so one is
+extern const int kLiftLeft = 7;       // DR4B motor, left tower
+extern const int kLiftRight = -17;    // DR4B motor, right tower. The two are mirrored on one shaft, so one is
                                       // reversed. CHECK which: R1 must raise the lift. If it drives down, move the minus
-extern const int kClawRollers = 10;   // PLACEHOLDER  vertical roller claw motor
-extern const int kLiftRotation = 7;   // PLACEHOLDER  rotation sensor on the lift's stage-1 bottom pivot (not used while the
+extern const int kClawRollers = 6;    // PLACEHOLDER  vertical roller claw motor (was 10, that is an IMU now)
+extern const int kLiftRotation = 3;   // PLACEHOLDER  rotation sensor on the lift's stage-1 bottom pivot (not used while the
                                       // lift reads its motor encoders, dr4b::kUseMotorEncoders)
 extern const int kClawSensor = 8;     // PLACEHOLDER  distance sensor looking across the claw throat
-extern const int kDistFront = 9;      // PLACEHOLDER  wall distance sensor, front
-extern const int kDistLeft = 13;      // PLACEHOLDER  wall distance sensor, left side
-extern const int kDistRight = 14;     // PLACEHOLDER  wall distance sensor, right side
-extern const int kToggleLeft = 15;    // PLACEHOLDER  5.5 W Toggle spinner motor, left brace
-extern const int kToggleRight = -17;  // PLACEHOLDER  5.5 W Toggle spinner motor, right brace (mirrored, so reversed)
+extern const int kDistFront = 13;     // PLACEHOLDER  wall distance sensor, front
+extern const int kDistLeft = 9;       // wall distance sensor, left side
+extern const int kDistRight = 19;     // wall distance sensor, right side
+extern const int kToggleLeft = -5;    // 5.5 W Toggle spinner motor, left brace
+extern const int kToggleRight = -14;  // 5.5 W Toggle spinner motor, right brace. CHECK: both are reversed here. If the two
+                                      // face each other on one shaft, one of them must NOT be, or they fight
 }  // namespace skills_ports
 
 // Final CAD: both flat under the cross member, 2.0 in behind the traction axle (the robot origin)
 constexpr double kImuARightIn = -2.59, kImuAForwardIn = -2.00;
 constexpr double kImuBRightIn = 2.09, kImuBForwardIn = -2.00;
-constexpr int kImuPortA = 20;
-constexpr int kImuPortB = 19;      // PLACEHOLDER, set to the second sensor's real port
+constexpr int kImuPortA = 10;
+constexpr int kImuPortB = 20;
 // Start values only. calib::run() (auto_calib.hpp) measures both scales on the robot, saves them on the SD
 // card, and initialize() loads them over these on every start.
 constexpr double kImuScaleA = 1.0; // MEASURE as mounted: 3600 / raw after 10 turns (was 1.0112 on the old robot)

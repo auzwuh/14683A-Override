@@ -7,6 +7,7 @@
 #include "gen/features.hpp"
 #include "gen/setup.hpp"
 #include "skills_support.hpp"
+#include "auto_calib.hpp"
 
 
 using DriveMode = arc::Controller::DriveMode;
@@ -35,6 +36,8 @@ constexpr double kImuARightIn = -2.59, kImuAForwardIn = -2.00;
 constexpr double kImuBRightIn = 2.09, kImuBForwardIn = -2.00;
 constexpr int kImuPortA = 20;
 constexpr int kImuPortB = 19;      // PLACEHOLDER, set to the second sensor's real port
+// Start values only. calib::run() (auto_calib.hpp) measures both scales on the robot, saves them on the SD
+// card, and initialize() loads them over these on every start.
 constexpr double kImuScaleA = 1.0; // MEASURE as mounted: 3600 / raw after 10 turns (was 1.0112 on the old robot)
 constexpr double kImuScaleB = 1.0; // MEASURE
 arc::DualIMU imu(kImuPortA, kImuPortB, {.scale = {kImuScaleA, kImuScaleB}});
@@ -181,6 +184,8 @@ void initialize() {
     chassis.setPose(0, 0, 0);
     dr4b::zeroAtRest();  // lift must be resting on its bottom stop at power-on
     dr4b::computeRouteTargets();   // fills the Goal angles from the stacking model
+    calib::load();   // IMU scales and distance sensor offsets the robot measured itself (auto_calib.hpp)
+    rclaw::sensor();  // wake the claw sensor now, autonomous() reads the preload through it straight away
     if (preflight() > 0) controller.raw().rumble("---");  // long buzz = auton is missing tuned values, read the terminal
 }
 
@@ -375,6 +380,7 @@ void Auton::pidTest() {
 
 void autonomous() {
     // Skills only for now. Runs the ATTICUS skills route directly, no selector.
+    calib::clawFromPreload();   // claw sensor value from the preload, when the code has none
     skillsDr4b();
 }
 
@@ -423,6 +429,24 @@ void opcontrol() {
             controller.raw().print(0, 0, "Lift stage %d of %d   ", stage + 1, lastStage + 1);
             shownStage = stage;
             lastPrint = pros::millis();
+        }
+
+        // Self calibration: hold LEFT and RIGHT for half a second, back bumper on a clear wall.
+        // Never under field control, the robot drives itself for about 12 s (auto_calib.hpp).
+        static std::uint32_t calHeldSince = 0;
+        const bool calKeys = controller.raw().get_digital(pros::E_CONTROLLER_DIGITAL_LEFT) &&
+                             controller.raw().get_digital(pros::E_CONTROLLER_DIGITAL_RIGHT);
+        if (!calKeys || pros::competition::is_connected()) calHeldSince = 0;
+        else if (calHeldSince == 0) calHeldSince = pros::millis();
+        else if (pros::millis() - calHeldSince > 500) {
+            calHeldSince = 0;
+            controller.raw().print(0, 0, "Calibrating...      ");
+            const bool ok = calib::run();
+            pros::delay(60);
+            controller.raw().print(0, 0, ok ? "Calibration saved   " : "Calibration FAILED  ");
+            shownStage = -1;
+            lastPrint = pros::millis() + 2000;
+            continue;
         }
 
         // Roller claw. L1 intake, L2 outtake, otherwise hold the grip

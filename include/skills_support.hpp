@@ -760,6 +760,13 @@ class WallLocalizer {
         return ok;
     }
 
+    // Median raw reading of one mount, in, NAN without enough good samples (auto_calib.hpp).
+    double medianIn(int mount, int samples) {
+        Sample s[3];
+        sampleAll(s, samples);
+        return s[mount].med;
+    }
+
     // Robot parked square at a known distance from a wall. Prints raw medians.
     void printReadings() {
         Sample s[3];

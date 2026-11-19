@@ -167,6 +167,8 @@ class TrackingWheel {
          * @endcode
          */
         float getOffset();
+        /** @brief Change the offset while running (auto_calib.hpp measures it with a spin on the spot) */
+        void setOffset(float offset) { this->distance = offset; }
         /**
          * @brief Get the type of tracking wheel
          *

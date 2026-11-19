@@ -111,6 +111,12 @@ class DualIMU : public pros::Imu {
         std::lock_guard<pros::Mutex> lock(mutex_);
         return fuser_.inUse(i);
     }
+    // Scale of one sensor, changed while running (auto_calib.hpp). Counts from the next reading on.
+    void setScale(int i, double scale) const {
+        std::lock_guard<pros::Mutex> lock(mutex_);
+        updateLocked();
+        fuser_.config().scale[i] = scale;
+    }
     int activeCount() const {
         std::lock_guard<pros::Mutex> lock(mutex_);
         return fuser_.activeCount();

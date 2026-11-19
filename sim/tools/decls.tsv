@@ -1,0 +1,220 @@
+Device	Device	device.hpp:75		explicit Device(const std::uint8_t port)
+Device	get_port	device.hpp:94		std::uint8_t get_port(void) const
+Device	is_installed	device.hpp:114	virtual	virtual bool is_installed()
+Device	get_plugged_type	device.hpp:139		pros::DeviceType get_plugged_type() const
+Device	get_plugged_type	device.hpp:166		static pros::DeviceType get_plugged_type(std::uint8_t port)
+Device	get_all_devices	device.hpp:183		static std::vector<Device> get_all_devices(pros::DeviceType device_type = pros::DeviceType::undefined)
+Motor	Motor	motors.hpp:74		Motor(const std::int8_t port, const pros::v5::MotorGears gearset = pros::v5::MotorGears::invalid, const pros::v5::MotorUnits encoder_units = pros::v5::MotorUnits::invalid)
+Motor	move	motors.hpp:112		std::int32_t move(std::int32_t voltage) const
+Motor	move_absolute	motors.hpp:158		std::int32_t move_absolute(const double position, const std::int32_t velocity) const
+Motor	move_relative	motors.hpp:199		std::int32_t move_relative(const double position, const std::int32_t velocity) const
+Motor	move_velocity	motors.hpp:231		std::int32_t move_velocity(const std::int32_t velocity) const
+Motor	move_voltage	motors.hpp:257		std::int32_t move_voltage(const std::int32_t voltage) const
+Motor	brake	motors.hpp:284		std::int32_t brake(void) const
+Motor	modify_profiled_velocity	motors.hpp:312		std::int32_t modify_profiled_velocity(const std::int32_t velocity) const
+Motor	get_target_position	motors.hpp:349		double get_target_position(const std::uint8_t index = 0) const
+Motor	get_target_velocity	motors.hpp:384		std::int32_t get_target_velocity(const std::uint8_t index = 0) const
+Motor	get_actual_velocity	motors.hpp:417		double get_actual_velocity(const std::uint8_t index = 0) const
+Motor	get_current_draw	motors.hpp:453		std::int32_t get_current_draw(const std::uint8_t index = 0) const
+Motor	get_direction	motors.hpp:489		std::int32_t get_direction(const std::uint8_t index = 0) const
+Motor	get_efficiency	motors.hpp:530		double get_efficiency(const std::uint8_t index = 0) const
+Motor	get_faults	motors.hpp:567		std::uint32_t get_faults(const std::uint8_t index = 0) const
+Motor	get_flags	motors.hpp:604		std::uint32_t get_flags(const std::uint8_t index = 0) const
+Motor	get_position	motors.hpp:640		double get_position(const std::uint8_t index = 0) const
+Motor	get_power	motors.hpp:676		double get_power(const std::uint8_t index = 0) const
+Motor	get_raw_position	motors.hpp:721		std::int32_t get_raw_position(std::uint32_t* const timestamp, const std::uint8_t index = 0) const
+Motor	get_temperature	motors.hpp:757		double get_temperature(const std::uint8_t index = 0) const
+Motor	get_torque	motors.hpp:793		double get_torque(const std::uint8_t index = 0) const
+Motor	get_voltage	motors.hpp:829		std::int32_t get_voltage(const std::uint8_t index = 0) const
+Motor	is_over_current	motors.hpp:866		std::int32_t is_over_current(const std::uint8_t index = 0) const
+Motor	is_over_temp	motors.hpp:902		std::int32_t is_over_temp(const std::uint8_t index = 0) const
+Motor	get_brake_mode	motors.hpp:940		MotorBrake get_brake_mode(const std::uint8_t index = 0) const
+Motor	get_current_limit	motors.hpp:974		std::int32_t get_current_limit(const std::uint8_t index = 0) const
+Motor	get_encoder_units	motors.hpp:1005		MotorUnits get_encoder_units(const std::uint8_t index = 0) const
+Motor	get_gearing	motors.hpp:1036		MotorGears get_gearing(const std::uint8_t index = 0) const
+Motor	get_voltage_limit	motors.hpp:1067		std::int32_t get_voltage_limit(const std::uint8_t index = 0) const
+Motor	is_reversed	motors.hpp:1097		std::int32_t is_reversed(const std::uint8_t index = 0) const
+Motor	get_type	motors.hpp:1128		MotorType get_type(const std::uint8_t index = 0) const
+Motor	set_brake_mode	motors.hpp:1163		std::int32_t set_brake_mode(const MotorBrake mode, const std::uint8_t index = 0) const
+Motor	set_brake_mode	motors.hpp:1197		std::int32_t set_brake_mode(const pros::motor_brake_mode_e_t mode, const std::uint8_t index = 0) const
+Motor	set_current_limit	motors.hpp:1237		std::int32_t set_current_limit(const std::int32_t limit, const std::uint8_t index = 0) const
+Motor	set_encoder_units	motors.hpp:1262		std::int32_t set_encoder_units(const MotorUnits units, const std::uint8_t index = 0) const
+Motor	set_encoder_units	motors.hpp:1297		std::int32_t set_encoder_units(const pros::motor_encoder_units_e_t units, const std::uint8_t index = 0) const
+Motor	set_gearing	motors.hpp:1331		std::int32_t set_gearing(const MotorGears gearset, const std::uint8_t index = 0) const
+Motor	set_gearing	motors.hpp:1368		std::int32_t set_gearing(const pros::motor_gearset_e_t gearset, const std::uint8_t index = 0) const
+Motor	set_reversed	motors.hpp:1403		std::int32_t set_reversed(const bool reverse, const std::uint8_t index = 0)
+Motor	set_voltage_limit	motors.hpp:1433		std::int32_t set_voltage_limit(const std::int32_t limit, const std::uint8_t index = 0) const
+Motor	set_zero_position	motors.hpp:1476		std::int32_t set_zero_position(const double position, const std::uint8_t index = 0) const
+Motor	tare_position	motors.hpp:1511		std::int32_t tare_position(const std::uint8_t index = 0) const
+Motor	size	motors.hpp:1519		std::int8_t size(void) const
+Motor	get_all_devices	motors.hpp:1533		static std::vector<Motor> get_all_devices()
+Motor	get_port	motors.hpp:1541		std::int8_t get_port(const std::uint8_t index = 0) const
+Motor	get_target_position_all	motors.hpp:1569		std::vector<double> get_target_position_all(void) const
+Motor	get_target_velocity_all	motors.hpp:1595		std::vector<std::int32_t> get_target_velocity_all(void) const
+Motor	get_actual_velocity_all	motors.hpp:1621		std::vector<double> get_actual_velocity_all(void) const
+Motor	get_current_draw_all	motors.hpp:1648		std::vector<std::int32_t> get_current_draw_all(void) const
+Motor	get_direction_all	motors.hpp:1676		std::vector<std::int32_t> get_direction_all(void) const
+Motor	get_efficiency_all	motors.hpp:1707		std::vector<double> get_efficiency_all(void) const
+Motor	get_faults_all	motors.hpp:1734		std::vector<std::uint32_t> get_faults_all(void) const
+Motor	get_flags_all	motors.hpp:1762		std::vector<std::uint32_t> get_flags_all(void) const
+Motor	get_position_all	motors.hpp:1789		std::vector<double> get_position_all(void) const
+Motor	get_power_all	motors.hpp:1815		std::vector<double> get_power_all(void) const
+Motor	get_raw_position_all	motors.hpp:1848		std::vector<std::int32_t> get_raw_position_all(std::uint32_t* const timestamp) const
+Motor	get_temperature_all	motors.hpp:1873		std::vector<double> get_temperature_all(void) const
+Motor	get_torque_all	motors.hpp:1898		std::vector<double> get_torque_all(void) const
+Motor	get_voltage_all	motors.hpp:1924		std::vector<std::int32_t> get_voltage_all(void) const
+Motor	is_over_current_all	motors.hpp:1950		std::vector<std::int32_t> is_over_current_all(void) const
+Motor	is_over_temp_all	motors.hpp:1975		std::vector<std::int32_t> is_over_temp_all(void) const
+Motor	get_brake_mode_all	motors.hpp:1996		std::vector<MotorBrake> get_brake_mode_all(void) const
+Motor	get_current_limit_all	motors.hpp:2021		std::vector<std::int32_t> get_current_limit_all(void) const
+Motor	get_encoder_units_all	motors.hpp:2041		std::vector<MotorUnits> get_encoder_units_all(void) const
+Motor	get_gearing_all	motors.hpp:2061		std::vector<MotorGears> get_gearing_all(void) const
+Motor	get_port_all	motors.hpp:2068		std::vector<std::int8_t> get_port_all(void) const
+Motor	get_voltage_limit_all	motors.hpp:2091		std::vector<std::int32_t> get_voltage_limit_all(void) const
+Motor	is_reversed_all	motors.hpp:2108		std::vector<std::int32_t> is_reversed_all(void) const
+Motor	get_type_all	motors.hpp:2128		std::vector<MotorType> get_type_all(void) const
+Motor	set_brake_mode_all	motors.hpp:2152		std::int32_t set_brake_mode_all(const MotorBrake mode) const
+Motor	set_brake_mode_all	motors.hpp:2176		std::int32_t set_brake_mode_all(const pros::motor_brake_mode_e_t mode) const
+Motor	set_current_limit_all	motors.hpp:2206		std::int32_t set_current_limit_all(const std::int32_t limit) const
+Motor	set_encoder_units_all	motors.hpp:2242		std::int32_t set_encoder_units_all(const MotorUnits units) const
+Motor	set_encoder_units_all	motors.hpp:2267		std::int32_t set_encoder_units_all(const pros::motor_encoder_units_e_t units) const
+Motor	set_gearing_all	motors.hpp:2292		std::int32_t set_gearing_all(const MotorGears gearset) const
+Motor	set_gearing_all	motors.hpp:2317		std::int32_t set_gearing_all(const pros::motor_gearset_e_t gearset) const
+Motor	set_reversed_all	motors.hpp:2339		std::int32_t set_reversed_all(const bool reverse)
+Motor	set_voltage_limit_all	motors.hpp:2380		std::int32_t set_voltage_limit_all(const std::int32_t limit) const
+Motor	set_zero_position_all	motors.hpp:2411		std::int32_t set_zero_position_all(const double position) const
+Motor	tare_position_all	motors.hpp:2435		std::int32_t tare_position_all(void) const
+MotorGroup	MotorGroup	motor_group.hpp:74		MotorGroup(const std::initializer_list<std::int8_t>, const pros::v5::MotorGears gearset = pros::v5::MotorGears::invalid, const pros::v5::MotorUnits encoder_units = pros::v5::MotorUnits::invalid)
+MotorGroup	MotorGroup	motor_group.hpp:113		MotorGroup(const std::vector<std::int8_t>& ports, const pros::v5::MotorGears gearset = pros::v5::MotorGears::invalid, const pros::v5::MotorUnits encoder_units = pros::v5::MotorUnits::invalid)
+MotorGroup	MotorGroup	motor_group.hpp:144		MotorGroup(AbstractMotor& motor_group)
+MotorGroup	move	motor_group.hpp:180		std::int32_t move(std::int32_t voltage) const
+MotorGroup	move_absolute	motor_group.hpp:226		std::int32_t move_absolute(const double position, const std::int32_t velocity) const
+MotorGroup	move_relative	motor_group.hpp:268		std::int32_t move_relative(const double position, const std::int32_t velocity) const
+MotorGroup	move_velocity	motor_group.hpp:301		std::int32_t move_velocity(const std::int32_t velocity) const
+MotorGroup	move_voltage	motor_group.hpp:325		std::int32_t move_voltage(const std::int32_t voltage) const
+MotorGroup	brake	motor_group.hpp:354		std::int32_t brake(void) const
+MotorGroup	modify_profiled_velocity	motor_group.hpp:383		std::int32_t modify_profiled_velocity(const std::int32_t velocity) const
+MotorGroup	get_target_position	motor_group.hpp:413		double get_target_position(const std::uint8_t index) const
+MotorGroup	get_target_position_all	motor_group.hpp:436		std::vector<double> get_target_position_all(void) const
+MotorGroup	get_target_velocity	motor_group.hpp:467		std::int32_t get_target_velocity(const std::uint8_t index = 0) const
+MotorGroup	get_target_velocity_all	motor_group.hpp:493		std::vector<std::int32_t> get_target_velocity_all(void) const
+MotorGroup	get_actual_velocity	motor_group.hpp:531		double get_actual_velocity(const std::uint8_t index = 0) const
+MotorGroup	get_actual_velocity_all	motor_group.hpp:558		std::vector<double> get_actual_velocity_all(void) const
+MotorGroup	get_current_draw	motor_group.hpp:591		std::int32_t get_current_draw(const std::uint8_t index = 0) const
+MotorGroup	get_current_draw_all	motor_group.hpp:618		std::vector<std::int32_t> get_current_draw_all(void) const
+MotorGroup	get_direction	motor_group.hpp:651		std::int32_t get_direction(const std::uint8_t index = 0) const
+MotorGroup	get_direction_all	motor_group.hpp:677		std::vector<std::int32_t> get_direction_all(void) const
+MotorGroup	get_efficiency	motor_group.hpp:715		double get_efficiency(const std::uint8_t index = 0) const
+MotorGroup	get_efficiency_all	motor_group.hpp:745		std::vector<double> get_efficiency_all(void) const
+MotorGroup	get_faults	motor_group.hpp:778		std::uint32_t get_faults(const std::uint8_t index = 0) const
+MotorGroup	get_faults_all	motor_group.hpp:806		std::vector<std::uint32_t> get_faults_all(void) const
+MotorGroup	get_flags	motor_group.hpp:836		std::uint32_t get_flags(const std::uint8_t index = 0) const
+MotorGroup	get_flags_all	motor_group.hpp:863		std::vector<std::uint32_t> get_flags_all(void) const
+MotorGroup	get_position	motor_group.hpp:893		double get_position(const std::uint8_t index = 0) const
+MotorGroup	get_position_all	motor_group.hpp:918		std::vector<double> get_position_all(void) const
+MotorGroup	get_power	motor_group.hpp:948		double get_power(const std::uint8_t index = 0) const
+MotorGroup	get_power_all	motor_group.hpp:973		std::vector<double> get_power_all(void) const
+MotorGroup	get_raw_position	motor_group.hpp:1009		std::int32_t get_raw_position(std::uint32_t* const timestamp, const std::uint8_t index = 0) const
+MotorGroup	get_raw_position_all	motor_group.hpp:1039		std::vector<std::int32_t> get_raw_position_all(std::uint32_t* const timestamp) const
+MotorGroup	get_temperature	motor_group.hpp:1069		double get_temperature(const std::uint8_t index = 0) const
+MotorGroup	get_temperature_all	motor_group.hpp:1094		std::vector<double> get_temperature_all(void) const
+MotorGroup	get_torque	motor_group.hpp:1123		double get_torque(const std::uint8_t index = 0) const
+MotorGroup	get_torque_all	motor_group.hpp:1148		std::vector<double> get_torque_all(void) const
+MotorGroup	get_voltage	motor_group.hpp:1177		std::int32_t get_voltage(const std::uint8_t index = 0) const
+MotorGroup	get_voltage_all	motor_group.hpp:1202		std::vector<std::int32_t> get_voltage_all(void) const
+MotorGroup	is_over_current	motor_group.hpp:1233		std::int32_t is_over_current(const std::uint8_t index = 0) const
+MotorGroup	is_over_current_all	motor_group.hpp:1258		std::vector<std::int32_t> is_over_current_all(void) const
+MotorGroup	is_over_temp	motor_group.hpp:1288		std::int32_t is_over_temp(const std::uint8_t index = 0) const
+MotorGroup	is_over_temp_all	motor_group.hpp:1313		std::vector<std::int32_t> is_over_temp_all(void) const
+MotorGroup	get_brake_mode	motor_group.hpp:1345		MotorBrake get_brake_mode(const std::uint8_t index = 0) const
+MotorGroup	get_brake_mode_all	motor_group.hpp:1366		std::vector<MotorBrake> get_brake_mode_all(void) const
+MotorGroup	get_current_limit	motor_group.hpp:1396		std::int32_t get_current_limit(const std::uint8_t index = 0) const
+MotorGroup	get_current_limit_all	motor_group.hpp:1422		std::vector<std::int32_t> get_current_limit_all(void) const
+MotorGroup	get_encoder_units	motor_group.hpp:1447		MotorUnits get_encoder_units(const std::uint8_t index = 0) const
+MotorGroup	get_encoder_units_all	motor_group.hpp:1468		std::vector<MotorUnits> get_encoder_units_all(void) const
+MotorGroup	get_gearing	motor_group.hpp:1493		MotorGears get_gearing(const std::uint8_t index = 0) const
+MotorGroup	get_gearing_all	motor_group.hpp:1514		std::vector<MotorGears> get_gearing_all(void) const
+MotorGroup	get_port_all	motor_group.hpp:1522		std::vector<std::int8_t> get_port_all(void) const
+MotorGroup	get_voltage_limit	motor_group.hpp:1550		std::int32_t get_voltage_limit(const std::uint8_t index = 0) const
+MotorGroup	get_voltage_limit_all	motor_group.hpp:1574		std::vector<std::int32_t> get_voltage_limit_all(void) const
+MotorGroup	is_reversed	motor_group.hpp:1600		std::int32_t is_reversed(const std::uint8_t index = 0) const
+MotorGroup	is_reversed_all	motor_group.hpp:1620		std::vector<std::int32_t> is_reversed_all(void) const
+MotorGroup	get_type	motor_group.hpp:1645		MotorType get_type(const std::uint8_t index = 0) const
+MotorGroup	get_type_all	motor_group.hpp:1665		std::vector<MotorType> get_type_all(void) const
+MotorGroup	set_brake_mode	motor_group.hpp:1696		std::int32_t set_brake_mode(const MotorBrake mode, const std::uint8_t index = 0) const
+MotorGroup	set_brake_mode	motor_group.hpp:1726		std::int32_t set_brake_mode(const pros::motor_brake_mode_e_t mode, const std::uint8_t index = 0) const
+MotorGroup	set_brake_mode_all	motor_group.hpp:1752		std::int32_t set_brake_mode_all(const MotorBrake mode) const
+MotorGroup	set_brake_mode_all	motor_group.hpp:1778		std::int32_t set_brake_mode_all(const pros::motor_brake_mode_e_t mode) const
+MotorGroup	set_current_limit	motor_group.hpp:1813		std::int32_t set_current_limit(const std::int32_t limit, const std::uint8_t index = 0) const
+MotorGroup	set_current_limit_all	motor_group.hpp:1843		std::int32_t set_current_limit_all(const std::int32_t limit) const
+MotorGroup	set_encoder_units	motor_group.hpp:1871		std::int32_t set_encoder_units(const MotorUnits units, const std::uint8_t index = 0) const
+MotorGroup	set_encoder_units	motor_group.hpp:1899		std::int32_t set_encoder_units(const pros::motor_encoder_units_e_t units, const std::uint8_t index = 0) const
+MotorGroup	set_encoder_units_all	motor_group.hpp:1924		std::int32_t set_encoder_units_all(const MotorUnits units) const
+MotorGroup	set_encoder_units_all	motor_group.hpp:1949		std::int32_t set_encoder_units_all(const pros::motor_encoder_units_e_t units) const
+MotorGroup	set_gearing	motor_group.hpp:1985		std::int32_t set_gearing(std::vector<pros::motor_gearset_e_t> gearsets) const
+MotorGroup	set_gearing	motor_group.hpp:2014		std::int32_t set_gearing(const pros::motor_gearset_e_t gearset, const std::uint8_t index = 0) const
+MotorGroup	set_gearing	motor_group.hpp:2046		std::int32_t set_gearing(std::vector<MotorGears> gearsets) const
+MotorGroup	set_gearing	motor_group.hpp:2076		std::int32_t set_gearing(const MotorGears gearset, const std::uint8_t index = 0) const
+MotorGroup	set_gearing_all	motor_group.hpp:2101		std::int32_t set_gearing_all(const MotorGears gearset) const
+MotorGroup	set_gearing_all	motor_group.hpp:2126		std::int32_t set_gearing_all(const pros::motor_gearset_e_t gearset) const
+MotorGroup	set_reversed	motor_group.hpp:2158		std::int32_t set_reversed(const bool reverse, const std::uint8_t index = 0)
+MotorGroup	set_reversed_all	motor_group.hpp:2183		std::int32_t set_reversed_all(const bool reverse)
+MotorGroup	set_voltage_limit	motor_group.hpp:2218		std::int32_t set_voltage_limit(const std::int32_t limit, const std::uint8_t index = 0) const
+MotorGroup	set_voltage_limit_all	motor_group.hpp:2249		std::int32_t set_voltage_limit_all(const std::int32_t limit) const
+MotorGroup	set_zero_position	motor_group.hpp:2284		std::int32_t set_zero_position(const double position, const std::uint8_t index = 0) const
+MotorGroup	set_zero_position_all	motor_group.hpp:2315		std::int32_t set_zero_position_all(const double position) const
+MotorGroup	tare_position	motor_group.hpp:2346		std::int32_t tare_position(const std::uint8_t index = 0) const
+MotorGroup	tare_position_all	motor_group.hpp:2369		std::int32_t tare_position_all(void) const
+MotorGroup	size	motor_group.hpp:2376		std::int8_t size(void) const
+MotorGroup	get_port	motor_group.hpp:2387		std::int8_t get_port(const std::uint8_t index = 0) const
+MotorGroup	operator+=	motor_group.hpp:2395		void operator+=(AbstractMotor&)
+MotorGroup	append	motor_group.hpp:2403		void append(AbstractMotor&)
+MotorGroup	erase_port	motor_group.hpp:2411		void erase_port(std::int8_t port)
+Imu	get_imu	imu.hpp:111		static Imu get_imu()
+Imu	reset	imu.hpp:145	virtual	virtual std::int32_t reset(bool blocking = false) const
+Imu	set_data_rate	imu.hpp:191	virtual	virtual std::int32_t set_data_rate(std::uint32_t rate) const
+Imu	get_all_devices	imu.hpp:207		static std::vector<Imu> get_all_devices()
+Imu	get_rotation	imu.hpp:243	virtual	virtual double get_rotation() const
+Imu	get_heading	imu.hpp:279	virtual	virtual double get_heading() const
+Imu	get_quaternion	imu.hpp:312	virtual	virtual pros::quaternion_s_t get_quaternion() const
+Imu	get_euler	imu.hpp:345	virtual	virtual pros::euler_s_t get_euler() const
+Imu	get_pitch	imu.hpp:376	virtual	virtual double get_pitch() const
+Imu	get_roll	imu.hpp:406	virtual	virtual double get_roll() const
+Imu	get_yaw	imu.hpp:436	virtual	virtual double get_yaw() const
+Imu	get_gyro_rate	imu.hpp:468	virtual	virtual pros::imu_gyro_s_t get_gyro_rate() const
+Imu	tare_rotation	imu.hpp:505	virtual	virtual std::int32_t tare_rotation() const
+Imu	tare_heading	imu.hpp:542	virtual	virtual std::int32_t tare_heading() const
+Imu	tare_pitch	imu.hpp:579	virtual	virtual std::int32_t tare_pitch() const
+Imu	tare_yaw	imu.hpp:616	virtual	virtual std::int32_t tare_yaw() const
+Imu	tare_roll	imu.hpp:653	virtual	virtual std::int32_t tare_roll() const
+Imu	tare	imu.hpp:684	virtual	virtual std::int32_t tare() const
+Imu	tare_euler	imu.hpp:715	virtual	virtual std::int32_t tare_euler() const
+Imu	set_heading	imu.hpp:751	virtual	virtual std::int32_t set_heading(const double target) const
+Imu	set_rotation	imu.hpp:786	virtual	virtual std::int32_t set_rotation(const double target) const
+Imu	set_yaw	imu.hpp:822	virtual	virtual std::int32_t set_yaw(const double target) const
+Imu	set_pitch	imu.hpp:857	virtual	virtual std::int32_t set_pitch(const double target) const
+Imu	set_roll	imu.hpp:893	virtual	virtual std::int32_t set_roll(const double target) const
+Imu	set_euler	imu.hpp:929	virtual	virtual std::int32_t set_euler(const pros::euler_s_t target) const
+Imu	get_accel	imu.hpp:963	virtual	virtual pros::imu_accel_s_t get_accel() const
+Imu	get_status	imu.hpp:997	virtual	virtual pros::ImuStatus get_status() const
+Imu	is_calibrating	imu.hpp:1027	virtual	virtual bool is_calibrating() const
+Imu	get_physical_orientation	imu.hpp:1041	virtual	virtual imu_orientation_e_t get_physical_orientation() const
+Rotation	Rotation	rotation.hpp:56		Rotation(const std::int8_t port)
+Rotation	reset	rotation.hpp:89	virtual	virtual std::int32_t reset()
+Rotation	set_data_rate	rotation.hpp:120	virtual	virtual std::int32_t set_data_rate(std::uint32_t rate) const
+Rotation	set_position	rotation.hpp:149	virtual	virtual std::int32_t set_position(std::int32_t position) const
+Rotation	reset_position	rotation.hpp:178	virtual	virtual std::int32_t reset_position(void) const
+Rotation	get_all_devices	rotation.hpp:192		static std::vector<Rotation> get_all_devices()
+Rotation	get_position	rotation.hpp:216	virtual	virtual std::int32_t get_position() const
+Rotation	get_velocity	rotation.hpp:242	virtual	virtual std::int32_t get_velocity() const
+Rotation	get_angle	rotation.hpp:266	virtual	virtual std::int32_t get_angle() const
+Rotation	set_reversed	rotation.hpp:297	virtual	virtual std::int32_t set_reversed(bool value) const
+Rotation	reverse	rotation.hpp:324	virtual	virtual std::int32_t reverse() const
+Rotation	get_reversed	rotation.hpp:348	virtual	virtual std::int32_t get_reversed() const
+Distance	Distance	distance.hpp:59		Distance(const std::uint8_t port)
+Distance	get	distance.hpp:86	virtual	virtual std::int32_t get()
+Distance	get_distance	distance.hpp:113	virtual	virtual std::int32_t get_distance()
+Distance	get_all_devices	distance.hpp:128		static std::vector<Distance> get_all_devices()
+Distance	get_confidence	distance.hpp:158	virtual	virtual std::int32_t get_confidence()
+Distance	get_object_size	distance.hpp:188	virtual	virtual std::int32_t get_object_size()
+Distance	get_object_velocity	distance.hpp:213	virtual	virtual double get_object_velocity()

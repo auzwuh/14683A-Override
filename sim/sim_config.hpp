@@ -164,7 +164,7 @@ constexpr double kDistConeHalfDeg = 10.0;   // ASSUMED 20 deg full cone, nearest
                                             // an object lower than the sensor is seen once the cone has dropped to its top
 constexpr int kDistRays = 5;
 constexpr double kDistMaxMm = 2000.0;
-constexpr double kFrontSensorHIn = 4.5, kSideSensorHIn = 7.0;
+constexpr double kFrontSensorHIn = 4.5, kSideSensorHIn = 6.6;   // sides as built (Austin's drawing, 19 Nov)
 constexpr double kDistJitterMm = 3.0, kDistJitterFrac = 0.01;   // sample to sample
 constexpr double kDistOffSdMm = 5.0, kDistScaleSd = 0.015;      // per sensor systematic (noise mode)
 constexpr double kDistCalIn = 6.0;                              // biasIn calibration distance

@@ -447,7 +447,7 @@ void worldInit() {
         imuNominal[i] = truth.phaseImu[i];
         imuNext[i] = truth.phaseImu[i];
     }
-    const double nominal[3][4] = {{5.71, 7.75, 0.0, kFrontSensorHIn}, {-4.96, 0.5, -90.0, kSideSensorHIn}, {4.96, 0.5, 90.0, kSideSensorHIn}};
+    const double nominal[3][4] = {{5.71, 7.75, 0.0, kFrontSensorHIn}, {-4.96, 1.99, -90.0, kSideSensorHIn}, {4.96, 1.99, 90.0, kSideSensorHIn}};   // sides as built: centred on the towers (frame centre coords)
     for (int i = 0; i < 3; ++i) {
         const double er = gauss(0, kMountErrSdIn), ef = gauss(0, kMountErrSdIn);
         truth.mount[i][0] = nominal[i][0] + er;

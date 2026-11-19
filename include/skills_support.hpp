@@ -577,14 +577,15 @@ class WallLocalizer {
     DistanceMount mounts[3] = {
         // planned from the CAD (robot origin to sensor face), re-measure after mounting
         {&distFront(), 5.71, 6.25, 0.0, NAN},   // front, right outer rail front end, 4.5 in up
-        // Sides 1.0 in BEHIND the traction axle (0.5 in ahead of the frame centre). Further forward
-        // than 0.1 the beam to the red wall passes too close to the wall stack Cups at all 7 lane
-        // Goal stops and those resets are rejected. Works from -2.25 to 0.1.
-        // Final CAD: the new 45 deg braces (right +-4.3 to 4.8) cross this spot at 7.1 to 7.8 in up,
-        // and on the right the Toggle chain (right 5.13 to 5.70) runs at 6.0 to 6.4 and 7.5 to 8.1 in up.
-        // The right sensor must sit outboard of the chain (right > 5.7) or clear of both runs.
-        {&distLeft(), -4.96, -1.0, -90.0, NAN},  // left tower outer face, 7 in up
-        {&distRight(), 4.96, -1.0, 90.0, NAN},   // right tower outer face, 7 in up
+        // Sides, AS BUILT (Austin's drawing, 19 Nov): flat on the outer face of each tower, centred on
+        // the tower fore and aft, window 6.6 in above the tiles, no spacer. The tower is 1.49 to 2.49 in
+        // ahead of the frame centre (final CAD), so its middle is 0.49 in AHEAD of the traction axle.
+        // The plan was 1.0 in behind the axle: from further forward than 0.1 the beam to the red wall
+        // passes close to the wall stack Cups at the lane Goal stops and those fixes are rejected.
+        // rightIn is the tower face (4.25) plus the sensor. calib::run() measures the offset along the
+        // beam (biasIn), so only forwardIn has to be right here.
+        {&distLeft(), -4.96, 0.49, -90.0, NAN},  // left tower outer face, 6.6 in up
+        {&distRight(), 4.96, 0.49, 90.0, NAN},   // right tower outer face, 6.6 in up, chain 0.18 in outside it
     };
     bool verbose = true;
 

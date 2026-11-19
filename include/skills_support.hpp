@@ -30,8 +30,9 @@ namespace skills {
 // Clock checks at the Tall Goal. If a leg cannot finish inside 60 s the routine
 // stops there, already touching the Midfield. Legs measured in ATTICUS v5 (no
 // settling or lift waits), so each limit keeps about 1.4 s of margin. Tune from runs.
-inline uint32_t kSkipALegAfterMs = 54000;   // A, (96,96), about 4.6 s
-inline uint32_t kLastLegStartMs = 53500;    // B, (120,120), about 5.1 s
+// Route v21, simulated: A takes 4.8 to 5.4 s from the Tall Goal release to its own release, B 4.7 s.
+inline uint32_t kSkipALegAfterMs = 54200;   // A, (96,96)
+inline uint32_t kLastLegStartMs = 54800;    // B, (120,120)
 // Checked at the Alliance Goal before each late piece. Past the limit the robot parks
 // in the Midfield instead (+8). Start values are 60 s minus the simulated time for the
 // piece and the park after it (sim-tuned drive gains). Retime from the [t] lines.
@@ -82,6 +83,8 @@ inline double kLoader = 0.0;      // pickup at the rest pose, object standing on
 inline double kFloor = 0.0;       // same pickup pose for floor Cup+Pins (ASSUMED)
 inline double kCarry = 8.0;       // STARTING VALUE (32 motor deg). travel height with a held object. Keep it at 20 deg or less: higher, the back of
                                   // the lift sticks out past the frame and hits the wall on the Loader lane turns
+inline double kPreRaise = 18.0;   // STARTING VALUE. Loader loads for a tall stack ride at this height from the Loader to the lane turn, so the
+                                  // lift has less left to do on the drive in and the robot does not have to stop and wait for it. Same 20 deg limit as kCarry
 inline double kToggleUp = 37.0;   // STARTING VALUE (148 motor deg, Pin bottom 15.7 in up, 1 in over the turning Toggle). claw and held Pin clear above the wall and Toggle while the paddle spins
                                   // (Toggle top 14.3 in up, 14.4 as it turns, paddle sweeps to 14.9 on the right)
 // Goal placements used by the skills route, in route order. Filled by
@@ -89,6 +92,7 @@ inline double kToggleUp = 37.0;   // STARTING VALUE (148 motor deg, Pin bottom 1
 inline double kShort[6] = {NAN, NAN, NAN, NAN, NAN, NAN};     // Short Goal, placement 1..
 inline double kAlliance[6] = {NAN, NAN, NAN, NAN, NAN, NAN};  // Alliance Goal, placement 1..
 inline double kTall[3] = {NAN, NAN, NAN};                     // Tall Goal, placement 1..
+inline double kAlliance2[2] = {NAN, NAN};                     // second red Alliance Goal (48,24), placement 1..
 // Controller (volts per deg, volts per deg/s, gravity volts at the heaviest lift
 // angle, see gravityShare)
 // STARTING VALUES from the simulator (17 Nov), not tuned on the robot, for 200 rpm lift
@@ -339,6 +343,7 @@ inline void computeRouteTargets() {
     for (int i = 0; i < 4; ++i) kShort[i] = levelAngle(kShortGoal, sh[i].first, sh[i].second);
     for (int i = 0; i < 5; ++i) kAlliance[i] = levelAngle(kAllianceGoal, al[i].first, al[i].second);
     for (int i = 0; i < 3; ++i) kTall[i] = levelAngle(kTallGoal, ta[i].first, ta[i].second);
+    for (int i = 0; i < 2; ++i) kAlliance2[i] = levelAngle(kAllianceGoal, al[i].first, al[i].second);
     printLevels();
 }
 }  // namespace dr4b
@@ -658,11 +663,14 @@ class WallLocalizer {
     int kCloseMv = 3000;          // creep voltage (TUNE: must start the robot rolling)
     int kCloseSlowMv = 1800;      // voltage over the last inch. It is raised by itself if the robot stalls
     double kCloseLeadIn = 0.20;   // cut the motors this far early, the robot rolls on a little (TUNE from the [close] line)
+    double kCloseFixIn = 0.08;    // ended further than this from the target: one short nudge back (or on)
+    int kCloseSamples = 6;        // front sensor readings for the wall distance (median). With 4 the reading itself was 0.2 in
+                                  // off in 2 of 64 simulated runs (3 mm of sensor noise), enough to end outside the paddle's window
     bool closeToWall(double frontIn, double gapIn, int timeoutMs = 1500) {
         pauseContinuous(true);
         chassis.cancelAllMotions();
         Sample s[3];
-        sampleAll(s, kSamples);
+        sampleAll(s, kCloseSamples);
         const arc::Pose p0 = chassis.getPose();
         const DistanceMount& m = mounts[0];
         const bool uncal = std::isnan(m.biasIn);
@@ -714,12 +722,37 @@ class WallLocalizer {
         leftDrive.brake();
         rightDrive.brake();
         pros::delay(120);
+        gone = progress(chassis.getPose());
+        double off = travel - gone * dir;   // + = stopped short of the target
+        // One nudge when it ended more than kCloseFixIn off. The robot rolls 0.1 to 0.25 in past the
+        // cut-off, and the Toggle paddle's window is only 0.6 in wide. Simulated: 1 run in 30 ended
+        // so close that both paddle ends struck and the Toggle finished on the wrong colour.
+        if (std::fabs(off) > kCloseFixIn) {
+            const double fdir = off > 0.0 ? 1.0 : -1.0, from = gone * dir, need = std::fabs(off) - 0.05;
+            const auto fixEnd = pros::millis() + 300;
+            double lastAt = from;
+            auto lastT = pros::millis();
+            int fboost = 0;
+            while (pros::millis() < fixEnd) {
+                const double at = progress(chassis.getPose()) * dir;   // forward travel since the start
+                if ((at - from) * fdir >= need) break;
+                if (std::fabs(at - lastAt) > 0.02) { lastAt = at; lastT = pros::millis(); }
+                else if (pros::millis() - lastT > 60) { fboost += 200; lastT = pros::millis(); }
+                const int mv = static_cast<int>(fdir * std::min(4000, kCloseSlowMv + fboost));
+                leftDrive.move_voltage(mv);
+                rightDrive.move_voltage(mv);
+                pros::delay(5);
+            }
+            leftDrive.brake();
+            rightDrive.brake();
+            pros::delay(80);
+            gone = progress(chassis.getPose());
+            off = travel - gone * dir;
+        }
         leftDrive.set_brake_mode_all(was);
         rightDrive.set_brake_mode_all(was);
         leftDrive.brake();   // again, so the restored mode (HOLD during a Toggle visit) takes hold
         rightDrive.brake();
-        gone = progress(chassis.getPose());
-        const double off = travel - gone * dir;   // + = stopped short of the target
         const bool ok = std::fabs(off) <= 0.25;
         pauseContinuous(false);
         std::printf("[close] %s read %.2f in, moved %.2f of %.2f in, gap now about %.2f%s\n", how, range, gone * dir, travel,
@@ -909,11 +942,60 @@ inline void parkMidfield(float bx, float by, float vx, float vy, float px, float
 // lands on that point even when the robot started a little off the planned line. A move
 // to a fixed stop point instead swings the claw about 0.8 in sideways for every inch the
 // start was off (the first Loader grab missed that way in the simulator).
-inline void reachTo(float x, float y, float reachIn, int timeoutMs, bool async = false) {
+//
+// Re-aim (route v21). moveToPoint steers at its stop point and stops steering 6 in from it. A robot
+// that is 0.2 in to the side there ends up pointing 2 deg past the Goal, and the claw is 7 to 9 in
+// ahead of the robot. Measured in the simulator: the robot believed it was aimed 1 to 3.6 deg off
+// at most releases, which was most of the sideways miss on every Goal. So kReaimIn before the stop
+// the drive is started again from where the robot is now. The new stop point lies on the line
+// from the robot through (x, y), and the steering that follows turns the robot onto it.
+// Costs no time. Only for a drive that is waited for (not async), and only when it starts at
+// least 4 in further out (after a chained move or a long diagonal). 0 = off.
+// Keep it at 16 or more. The steering needs about 10 in to settle before it switches off 6 in
+// from the stop. Started later it is still turning at that moment and the robot swings 4 to 10 deg
+// past (simulated at 12: a front rail hit the Goal base in 2 of 16 runs).
+inline double kReaimIn = 18.0;
+// roll: end still rolling (within 2 in, under 25 in/s) for a drive that carries straight on, like
+// the one to the lift gate.
+inline void reachTo(float x, float y, float reachIn, int timeoutMs, bool async = false, bool roll = false) {
+    auto drive = [&](int timeout, bool as) {
+        const arc::Pose p = chassis.getPose();
+        const float d = std::hypot(x - p.x, y - p.y);
+        const float k = d > reachIn ? (d - reachIn) / d : 0.0f;   // already inside reach: stay put
+        arc::MoveToPointParams prm{.timeout = timeout, .async = as};
+        if (roll) { prm.velocityExit = 25.0f; prm.errorExit = 2.0f; }
+        chassis.moveToPoint(p.x + (x - p.x) * k, p.y + (y - p.y) * k, prm);
+        return d - reachIn;
+    };
+    auto left = [&] { const arc::Pose p = chassis.getPose(); return std::hypot(x - p.x, y - p.y) - reachIn; };
+    if (async || kReaimIn <= 0.0 || left() < kReaimIn + 4.0) { drive(timeoutMs, async); return; }
+    const auto t0 = pros::millis();
+    drive(timeoutMs, true);
+    pros::delay(10);
+    while (chassis.isInMotion() && left() > kReaimIn) pros::delay(10);
+    if (!chassis.isInMotion()) return;   // timed out or cancelled before the re-aim point
+    chassis.cancelMotion();
+    chassis.waitUntilDone();             // the first drive has let go of the chassis
+    drive(std::max(300, timeoutMs - static_cast<int>(pros::millis() - t0)), false);
+}
+
+// Aim fix, at the placing stop just before the release. If the robot believes it is pointing more
+// than kAimTolDeg to the side of (x, y) it turns the last bit. The claw is 5 to 9 in ahead of the
+// robot, so 3 deg is 0.3 to 0.5 in at the claw. Simulated: about 1 release in 6 on the Loader lanes
+// arrives that far off, and those were the ones that missed the post. A missed post costs more
+// than its own Pin, because the robot counts it as placed and every later release on that Goal
+// is then too high. Does nothing (and takes no time) inside the tolerance.
+inline double kAimTolDeg = 3.0;
+inline int kAimTimeoutMs = 351;   // the simulator knows this turn by this number, keep it odd
+// tolDeg: tighter for a release that others are stacked on. The first Pin on the Tall Goal uses 1.5:
+// it came in 0.8 deg to one side on average (chained approach) and missed in 4 of 63 simulated runs,
+// and the two units placed on it afterwards are lost with it.
+inline void aimAt(float x, float y, double tolDeg = kAimTolDeg) {
     const arc::Pose p = chassis.getPose();
-    const float d = std::hypot(x - p.x, y - p.y);
-    const float k = d > reachIn ? (d - reachIn) / d : 0.0f;   // already inside reach: stay put
-    chassis.moveToPoint(p.x + (x - p.x) * k, p.y + (y - p.y) * k, {.timeout = timeoutMs, .async = async});
+    const double off = std::remainder(std::atan2(x - p.x, y - p.y) * 180.0 / M_PI - p.theta, 360.0);
+    if (!(std::fabs(off) > tolDeg) || std::hypot(x - p.x, y - p.y) < 3.0) return;
+    std::printf("[t %5.2f] aim %.1f deg off, turning\n", elapsedMs() / 1000.0, off);
+    chassis.turnToPoint(x, y, {.timeout = kAimTimeoutMs, .velocityExit = 10.0f, .errorExit = static_cast<float>(std::min(1.0, tolDeg / 2.0)), .settleTimeMs = 40});
 }
 
 // ---- Placing on a Goal, from what is REALLY on it ----
@@ -922,7 +1004,8 @@ inline void reachTo(float x, float y, float reachIn, int timeoutMs, bool async =
 // on each Goal and works out the lift height and the stop from that count when it gets there.
 // It can only know about grabs the claw sensor did not confirm. An object that was released
 // but missed the post still counts as placed.
-inline int onGoal[3] = {0, 0, 0};    // objects on the Short, Alliance and Tall Goal (dr4b::Goal order)
+inline int onGoal[4] = {0, 0, 0, 0}; // objects on the Short, Alliance and Tall Goal (dr4b::Goal order), then slot 3:
+                                     // the second red Alliance Goal (48,24). A slot of -1 below means the Goal's own.
 inline bool holding = true;          // false after a grab the claw sensor did not confirm. The preload starts in the claw
 inline double kClawReachIn = 9.5;    // robot origin to the held object's centre, lift down (MEASURE). Same as S_LOAD_IN in gen_route.py
 inline double kPlaceCarryIn = 0.4;   // how far past the claw centre a released object lands, the rollers throw it forward.
@@ -930,31 +1013,49 @@ inline double kPlaceCarryIn = 0.4;   // how far past the claw centre a released 
 inline double kGoalMinIn = 5.0;      // closest the origin may come to a Goal centre (4.72 seats the base in the notch)
 inline double kEmptyStopIn = 14.0;   // with nothing in the claw, stop this far out so the low claw stays off the stack
 
-inline void resetGoals() { onGoal[0] = onGoal[1] = onGoal[2] = 0; holding = true; }   // start of a run
+inline void resetGoals() { onGoal[0] = onGoal[1] = onGoal[2] = onGoal[3] = 0; holding = true; }   // start of a run
 // Call with the result of every rclaw::confirmGrip(). With no sensor value yet it assumes the grab worked.
 inline void noteGrip(bool seen) {
     holding = seen || std::isnan(rclaw::kSeesObjectMm);
     if (!holding) std::printf("[t %5.2f] nothing in the claw, the next placement is skipped\n", elapsedMs() / 1000.0);
 }
 // units: 1 for a bare Pin, 2 for a Cup+Pin
-inline double goalAngle(dr4b::Goal g, int units) {
-    return dr4b::levelAngle(g, onGoal[g], units == 2 ? dr4b::kCupPin : dr4b::kPin);
+inline double goalAngle(dr4b::Goal g, int units, int slot = -1) {
+    return dr4b::levelAngle(g, onGoal[slot < 0 ? g : slot], units == 2 ? dr4b::kCupPin : dr4b::kPin);
 }
-inline void liftForGoal(dr4b::Goal g, int units) {
-    if (holding) dr4b::to(goalAngle(g, units));
+inline void liftForGoal(dr4b::Goal g, int units, int slot = -1) {
+    if (holding) dr4b::to(goalAngle(g, units, slot));
 }
 // How far from the Goal centre the robot origin stops for this release
-inline float goalStopIn(dr4b::Goal g, int units) {
-    const double a = goalAngle(g, units);
+inline float goalStopIn(dr4b::Goal g, int units, int slot = -1) {
+    const double a = goalAngle(g, units, slot);
     if (!holding || std::isnan(a)) return static_cast<float>(kEmptyStopIn);
     return static_cast<float>(std::max(kGoalMinIn, kClawReachIn + kPlaceCarryIn - dr4b::clawBackIn(a)));
 }
-inline void releaseOn(dr4b::Goal g, int units) {
+inline void releaseOn(dr4b::Goal g, int units, int slot = -1) {
     if (!holding) return;
+    const int s = slot < 0 ? g : slot;
     rclaw::release();
-    onGoal[g] += units;
+    onGoal[s] += units;
     holding = false;
-    std::printf("[t %5.2f] Goal %d now holds %d\n", elapsedMs() / 1000.0, static_cast<int>(g), onGoal[g]);
+    std::printf("[t %5.2f] Goal %d now holds %d\n", elapsedMs() / 1000.0, s, onGoal[s]);
+}
+
+// Rolling lift gate, 6 in short of the placing stop on a tall stack. Up to here the claw is still
+// clear of the stack. With the lift up already the robot keeps rolling in. With the lift still more
+// than kGateTolDeg low it brakes here and waits, as the route did every time before (0.5 s each).
+inline double kGateTolDeg = 1.5;   // 1.5 deg is 0.63 in of height near the bottom, inside kDropClearIn
+inline void liftGate(int timeoutMs) {
+    const double t = dr4b::target();
+    if (!holding || std::isnan(t) || dr4b::angle() > t - kGateTolDeg) return;
+    leftDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+    rightDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+    leftDrive.brake();
+    rightDrive.brake();
+    std::printf("[t %5.2f] lift gate, waiting for the lift at %.1f of %.1f deg\n", elapsedMs() / 1000.0, dr4b::angle(), t);
+    dr4b::waitSettled(timeoutMs);
+    leftDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
+    rightDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 }
 
 // Toggle visit, with the robot facing the wall and the front rails a few inches off it.

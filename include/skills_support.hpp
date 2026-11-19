@@ -45,22 +45,15 @@ inline uint32_t elapsedMs() { return pros::millis() - startMs(); }
 }  // namespace skills
 
 // ===================================================================== ports
-// PLACEHOLDER ports (negative = reversed). Free of main.cpp's 2 4 5 11 12 16 19 20.
-// Replace with the real wiring before running.
+// The port NUMBERS are in src/main.cpp, with the drive, IMU and tracking wheel ports
+// (search for "namespace skills_ports"). Negative = reversed. Set them there.
 namespace skills_ports {
-constexpr int kLiftLeft = 3;       // PLACEHOLDER  DR4B motor, left tower
-constexpr int kLiftRight = -6;     // PLACEHOLDER  DR4B motor, right tower. The two are mirrored on one shaft, so one is
-                                   // reversed. CHECK which: R1 must raise the lift. If it drives down, move the minus
-constexpr int kClawRollers = 10;   // PLACEHOLDER  vertical roller claw motor
-constexpr int kLiftRotation = 7;   // PLACEHOLDER  rotation sensor on the stage-1 bottom pivot shaft
-constexpr int kClawSensor = 8;     // PLACEHOLDER  distance sensor looking across the claw throat
-constexpr int kDistFront = 9;      // PLACEHOLDER  wall sensors, see README for where they go
-constexpr int kDistLeft = 13;      // PLACEHOLDER
-constexpr int kDistRight = 14;     // PLACEHOLDER
-constexpr int kToggleLeft = 15;    // PLACEHOLDER  5.5 W Toggle spinner motor, left brace
-constexpr int kToggleRight = -17;  // PLACEHOLDER  5.5 W Toggle spinner motor, right brace (mirrored, so reversed)
-constexpr bool kPortsSet = true;
-static_assert(kPortsSet, "skills_support.hpp: set the ports above, then kPortsSet = true");
+extern const int kLiftLeft, kLiftRight;      // DR4B motors, left and right tower
+extern const int kClawRollers;               // vertical roller claw motor
+extern const int kLiftRotation;              // rotation sensor on the stage-1 bottom pivot shaft (only with kUseMotorEncoders off)
+extern const int kClawSensor;                // distance sensor looking across the claw throat
+extern const int kDistFront, kDistLeft, kDistRight;   // wall distance sensors
+extern const int kToggleLeft, kToggleRight;  // 5.5 W Toggle spinner motors
 }  // namespace skills_ports
 
 // ====================================================================== DR4B

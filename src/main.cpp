@@ -31,6 +31,24 @@ arc::MotorGroup clawRot({5}, 200.0, 0.25);
 // pros::Rotation horizontalEncoder(-15);
 pros::Rotation verticalEncoder(-16);  
 
+// Lift, claw, Toggle and sensor ports. Negative = reversed. ALL PLACEHOLDERS until the robot is
+// wired: replace each with the real port. Already taken above and below: 2 4 5 11 12 16 19 20.
+// The devices themselves are created in skills_support.hpp from these numbers.
+namespace skills_ports {
+extern const int kLiftLeft = 3;       // PLACEHOLDER  DR4B motor, left tower
+extern const int kLiftRight = -6;     // PLACEHOLDER  DR4B motor, right tower. The two are mirrored on one shaft, so one is
+                                      // reversed. CHECK which: R1 must raise the lift. If it drives down, move the minus
+extern const int kClawRollers = 10;   // PLACEHOLDER  vertical roller claw motor
+extern const int kLiftRotation = 7;   // PLACEHOLDER  rotation sensor on the lift's stage-1 bottom pivot (not used while the
+                                      // lift reads its motor encoders, dr4b::kUseMotorEncoders)
+extern const int kClawSensor = 8;     // PLACEHOLDER  distance sensor looking across the claw throat
+extern const int kDistFront = 9;      // PLACEHOLDER  wall distance sensor, front
+extern const int kDistLeft = 13;      // PLACEHOLDER  wall distance sensor, left side
+extern const int kDistRight = 14;     // PLACEHOLDER  wall distance sensor, right side
+extern const int kToggleLeft = 15;    // PLACEHOLDER  5.5 W Toggle spinner motor, left brace
+extern const int kToggleRight = -17;  // PLACEHOLDER  5.5 W Toggle spinner motor, right brace (mirrored, so reversed)
+}  // namespace skills_ports
+
 // Final CAD: both flat under the cross member, 2.0 in behind the traction axle (the robot origin)
 constexpr double kImuARightIn = -2.59, kImuAForwardIn = -2.00;
 constexpr double kImuBRightIn = 2.09, kImuBForwardIn = -2.00;

@@ -199,6 +199,10 @@ static void assignMotorTruth(MotorDev& m) {
     m.tauLim = kStallNm[m.gear] * (1.0 + spread);
     m.wFree = kFreeRpm[m.gear] * 2 * PI / 60.0 * (1.0 + 0.6 * spread);
     m.mech = mechOf(m.port);
+    if (m.mech == 1 || m.mech == 2) {   // what-if knobs: --drive-torque X (more motors on the drive), --drive-gear X (geared X times faster)
+        if (opt.driveTorque > 0) m.tauLim *= opt.driveTorque;
+        if (opt.driveGear > 0) { m.wFree *= opt.driveGear; m.tauLim /= opt.driveGear; }
+    }
     if (m.mech == 4) m.rotorJ = kRollerInertia;
     if (m.mech == 5 || m.port == wiring.toggle[0]) m.tauLim = kToggleMotorStallNm * (1.0 + spread);   // 5.5 W motor, 200 rpm (the default green numbers otherwise)
 }
@@ -319,7 +323,7 @@ int controllerDigital(int b) { return (b >= 0 && b < 32) ? script.digital[b] : 0
 
 // ================================================================ field
 namespace {
-struct Goal { const char* name; int type; double x, y; bool needsToggle; int objects = 0; int pins = 0; int startPins = 0; };
+struct Goal { const char* name; int type; double x, y; bool needsToggle; int objects = 0; int pins = 0; int startPins = 0; int fives = 0; };   // fives: alliance colour Pin halves, 5 points each
 std::vector<Goal> goals;
 struct Circle { double x, y, r, h; };
 std::vector<Circle> staticCups;   // wall stacks and diamond vertex Cups (beam targets only, the route stays clear of them)
@@ -342,6 +346,7 @@ struct Obj {
     int loader = -1;  // which Loader queue it belongs to
     double dz = 0;      // held: object bottom minus lift rise (minus the claw rise it was gripped at)
     double latOff = 0;  // held: sideways offset from the claw centre line
+    int five = 0;       // Midfield red/blue Pin: 1 = red half up (5 points in a Goal), -1 = blue half up (nothing for red)
 };
 std::vector<Obj> objs;
 struct Loader { double x, y; std::vector<int> queue; size_t next = 0; uint64_t presentAt = 0; int presented = -1; };
@@ -377,8 +382,14 @@ void buildField() {
             P(a, 1.58, x, y); staticCups.push_back({x, y, kCupR, h});
             P(a, 142.42, x, y); staticCups.push_back({x, y, kCupR, h});
         }
-    for (auto c : {std::pair{72.0, 96.0}, {96.0, 72.0}, {72.0, 48.0}, {48.0, 72.0}}) {     // diamond vertex Cups + Pins
-        double x, y; P(c.first, c.second, x, y); staticCups.push_back({x, y, kCupR, kCupPinH});
+    // Midfield diamond: a Cup with a red/blue Pin at each vertex. Real objects since 23 Nov (they were beam targets only):
+    // the claw can take them like the diagonal Cup+Pins. Field drawing: (72,48) and (48,72) have the RED half up.
+    for (auto c : {std::pair{72.0, 96.0}, {96.0, 72.0}, {72.0, 48.0}, {48.0, 72.0}}) {
+        Obj o; P(c.first, c.second, o.x, o.y);
+        const bool redUp = c.first + c.second < 144.0;
+        o.name = fmt("Midfield Cup+Pin (%g,%g) %s up", c.first, c.second, redUp ? "red" : "blue");
+        o.units = 2; o.state = kStanding; o.five = redUp ? 1 : -1;
+        objs.push_back(o);
     }
     if (opt.clusters)
         for (auto c : {std::pair{24.0, 120.0}, {48.0, 96.0}, {96.0, 48.0}, {120.0, 24.0}}) {   // clusters: clear Cup + 4 flat Pins
@@ -990,7 +1001,7 @@ static void releaseHeld() {
     else { ok = true; why = "seated"; }
     placements = counters.releases;
     const int before = g.objects;
-    if (ok) { g.objects += o.units; g.pins += 1; o.state = kOnGoal; }
+    if (ok) { g.objects += o.units; if (o.five) g.fives += o.five > 0; else g.pins += 1; o.state = kOnGoal; }
     else { o.state = kLost; addDebris(o, "dropped"); }
     heldNear = heldHit = -1;
     // where the object was relative to the Goal, along/across the heading
@@ -1487,5 +1498,6 @@ int pinsScored(bool applyToggle) {
         if (!applyToggle || !g.needsToggle || red) n += g.pins;
     return n;
 }
+int fivesScored() { int n = 0; for (const auto& g : goals) n += g.fives; return n; }   // red halves showing in any Goal
 bool holdingObject() { return heldObj >= 0; }
 }  // namespace sim

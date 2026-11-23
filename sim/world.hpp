@@ -72,6 +72,7 @@ double liftHoldVolts(double deg, bool withObject);   // nominal plant, centre of
 bool touchingMidfield();
 std::vector<GoalResult> goalResults();
 int pinsScored(bool applyToggle);
+int fivesScored();
 bool holdingObject();
 void toggleReset(double paddleDeg);   // selftest: Toggle back to yellow, paddle at this angle, counters cleared
 int toggleState();                    // 0 yellow, 1 blue, 2 red

@@ -90,6 +90,10 @@ void applyRobotConstants() {
     // until the claw clears the turning Toggle by about an inch, so it is solved on THIS seed's lift: the encoder angle
     // (arm angle + slop) that puts the claw underside (0.25 in below the held Pin) kToggleClearIn over the top of the
     // turning Toggle, 14.43 in.
+    if (opt.clockShiftMs > 0) {   // what-if: every clock limit later by this much (use with --auton-ms), as if the robot were that much faster
+        for (uint32_t* p : {&skills::kSkipALegAfterMs, &skills::kLastLegStartMs, &skills::kMidWStartMs, &skills::kMidSStartMs, &skills::kD24StartMs, &skills::kLoaderCycleStartMs})
+            *p += static_cast<uint32_t>(opt.clockShiftMs);
+    }
     const auto encoderDegForRise = [](double riseIn) {
         double lo = 0.0, hi = simcfg::kLiftTopDeg;
         for (int i = 0; i < 50; ++i) { const double m = 0.5 * (lo + hi); (liftRiseIn(m) < riseIn ? lo : hi) = m; }
@@ -548,8 +552,8 @@ void scoreAtRest(uint64_t t) {
     midfieldAtEnd = touchingMidfield();
     pinsAtEnd = pinsScored(false);
     pinsOwnedAtEnd = pinsScored(true);
-    pointsAtEnd = 10 * pinsOwnedAtEnd + (midfieldAtEnd ? 8 : 0);
-    pointsIfOwned = 10 * pinsAtEnd + (midfieldAtEnd ? 8 : 0);
+    pointsAtEnd = 10 * pinsOwnedAtEnd + 5 * fivesScored() + (midfieldAtEnd ? 8 : 0);
+    pointsIfOwned = 10 * pinsAtEnd + 5 * fivesScored() + (midfieldAtEnd ? 8 : 0);
     endX = body.x; endY = body.y; endTh = trueDeg();
     event(fmt("\"type\": \"end_of_auton\", \"points\": %d, \"pins\": %d, \"midfield\": %s, \"midfield_at_cut\": %s, \"true\": [%.2f, %.2f, %.1f], "
               "\"rolled_on_ms\": %d, \"true_speed_at_cut_in_s\": %.1f",
@@ -800,7 +804,7 @@ const Knob kKnobs[] = {
     {"--imu-jitter", &Options::imuJitterMs, "imujit"},   {"--imu-b-drop", &Options::imuBDropS, "imubdrop"},
     {"--imu-phase-b", &Options::imuPhaseB, "imuphb"},
     {"--pitch", &Options::pitchIn, "pitch"},             {"--lift-err", &Options::liftErrDeg, "lifterr"},
-    {"--lift-slop", &Options::liftSlopDeg, "liftslop"},  {"--lift-bands", &Options::liftBandNm, "bands"}, {"--band-count", &Options::bandCount, "bandn"}, {"--rigid-string", &Options::rigidString, "rigid"},
+    {"--lift-slop", &Options::liftSlopDeg, "liftslop"},  {"--lift-bands", &Options::liftBandNm, "bands"}, {"--band-count", &Options::bandCount, "bandn"}, {"--rigid-string", &Options::rigidString, "rigid"}, {"--drive-torque", &Options::driveTorque, "dtq"}, {"--drive-gear", &Options::driveGear, "dgear"}, {"--clock-shift", &Options::clockShiftMs, "cshift"},
     {"--grab-ahead", &Options::grabAheadIn, "grabahead"}, {"--grab-lat", &Options::grabLatIn, "grablat"},
     {"--release-ms", &Options::releaseMs, "relms"},      {"--release-fwd", &Options::releaseFwdIn, "relfwd"},
     {"--capture-r", &Options::captureR, "capr"},

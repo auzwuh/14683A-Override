@@ -19,13 +19,13 @@ void skillsDr4b() {
     localizer.endSquare(180.0, true);
     localizer.startContinuous();
     chassis.moveToPoint(37.05f, 56.95f, {.timeout = 471, .velocityExit = 20.0f, .errorExit = 1.5f});
-    chassis.turnToPoint(23.40f, 46.80f, {.timeout = 692, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
     skills::liftForGoal(dr4b::kShortGoal, 1);
+    chassis.turnToPoint(23.40f, 46.80f, {.timeout = 692, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
     skills::reachTo(23.40f, 46.80f, skills::goalStopIn(dr4b::kShortGoal, 1), 855);
     skills::aimAt(23.40f, 46.80f);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 1);
-    pros::delay(200);
+    pros::delay(120);
     chassis.moveToPoint(37.05f, 56.95f, {.timeout = 855, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(3.45f);
     dr4b::to(dr4b::kLoader);
@@ -51,7 +51,7 @@ void skillsDr4b() {
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     chassis.moveToPoint(57.33f, 46.80f, {.timeout = 1448, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(9.36f);
     dr4b::to(dr4b::kLoader);
@@ -75,7 +75,7 @@ void skillsDr4b() {
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     chassis.moveToPoint(57.33f, 46.80f, {.timeout = 1450, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(9.38f);
     dr4b::to(dr4b::kLoader);
@@ -99,7 +99,7 @@ void skillsDr4b() {
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kShortGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     chassis.moveToPoint(57.33f, 46.80f, {.timeout = 1459, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(9.46f);
     dr4b::to(dr4b::kLoader);
@@ -110,7 +110,6 @@ void skillsDr4b() {
     localizer.applyImmediateCorrectionAuto();
     pros::delay(150);
     skills::noteGrip(rclaw::confirmGrip(600));
-    chassis.turnToPoint(57.50f, 55.09f, {.timeout = 266, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80, .forwards = false});
     chassis.moveToPoint(57.50f, 55.09f, {.timeout = 714, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(2.06f);
     dr4b::to(dr4b::kCarry);
@@ -134,7 +133,7 @@ void skillsDr4b() {
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kAllianceGoal, 1);
-    pros::delay(200);
+    pros::delay(120);
     chassis.moveToPoint(-7.80f, 46.80f, {.timeout = 795, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(2.55f);
     dr4b::to(dr4b::kFloor);
@@ -147,14 +146,13 @@ void skillsDr4b() {
     rclaw::stopDriveOnObject(1200);
     chassis.waitUntilDone();
     skills::noteGrip(rclaw::confirmGrip(400));
-    pros::delay(150);
     skills::liftForGoal(dr4b::kAllianceGoal, 2);
     chassis.turnToPoint(-23.40f, 46.80f, {.timeout = 1101, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
     skills::reachTo(-23.40f, 46.80f, skills::goalStopIn(dr4b::kAllianceGoal, 2), 911);
     skills::aimAt(-23.40f, 46.80f);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kAllianceGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     if (skills::elapsedMs() > skills::kD24StartMs) { skills::parkMidfield(-19.75f, 28.57f, -15.17f, 20.24f, -10.60f, 11.92f); return; }
     chassis.moveToPoint(-19.75f, 28.57f, {.timeout = 921, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(3.43f);
@@ -168,14 +166,13 @@ void skillsDr4b() {
     rclaw::stopDriveOnObject(1200);
     chassis.waitUntilDone();
     skills::noteGrip(rclaw::confirmGrip(400));
-    pros::delay(150);
     skills::liftForGoal(dr4b::kAllianceGoal, 2);
     chassis.turnToPoint(-23.40f, 46.80f, {.timeout = 1099, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
     skills::reachTo(-23.40f, 46.80f, skills::goalStopIn(dr4b::kAllianceGoal, 2), 911);
     skills::aimAt(-23.40f, 46.80f);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kAllianceGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     if (skills::elapsedMs() > skills::kLoaderCycleStartMs) { skills::parkMidfield(-36.64f, 44.13f, -31.20f, 35.10f, -10.60f, 11.92f); return; }
     chassis.moveToPoint(-38.29f, 43.80f, {.timeout = 771, .errorExit = 3.33f, .forwards = false, .minSpeed = 44.0f, .settle = false, .async = true});
     chassis.waitUntil(2.80f);
@@ -201,7 +198,7 @@ void skillsDr4b() {
     localizer.applyImmediateCorrectionAuto();
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kAllianceGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     if (skills::elapsedMs() > skills::kLoaderCycleStartMs) { skills::parkMidfield(-36.90f, 46.80f, -31.20f, 35.10f, -10.60f, 11.92f); return; }
     chassis.moveToPoint(-57.33f, 46.80f, {.timeout = 1455, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(9.42f);
@@ -223,7 +220,7 @@ void skillsDr4b() {
     skills::aimAt(-46.80f, 23.40f);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kAllianceGoal, 1, 3);
-    pros::delay(200);
+    pros::delay(120);
     if (skills::elapsedMs() > skills::kTallPinStartMs) { skills::parkMidfield(-53.61f, 38.52f, -31.20f, 35.10f, -10.60f, 11.92f); return; }
     chassis.moveToPoint(-57.33f, 46.80f, {.timeout = 1175, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(5.57f);
@@ -252,16 +249,61 @@ void skillsDr4b() {
     skills::aimAt(0.00f, 0.00f, 1.5);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kTallGoal, 1);
-    pros::delay(200);
+    pros::delay(120);
     if (skills::elapsedMs() > skills::kSkipALegAfterMs) { rclaw::hold(); return; }
-    chassis.turnToPoint(-14.90f, 16.76f, {.timeout = 266, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0, .forwards = false});
     chassis.moveToPoint(-14.90f, 16.76f, {.timeout = 1063, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
     chassis.waitUntil(5.33f);
     dr4b::to(dr4b::kFloor);
     chassis.waitUntilDone();
-    chassis.turnToPoint(-10.73f, -7.80f, {.timeout = 538, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
-    chassis.moveToPoint(-10.73f, -7.80f, {.timeout = 1388, .velocityExit = 20.0f, .errorExit = 1.5f});
-    chassis.turnToPoint(13.06f, -18.67f, {.timeout = 660, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
+    if (skills::elapsedMs() <= skills::kMidWStartMs) {
+    chassis.turnToHeading(66.0f, {.timeout = 805, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
+    chassis.moveToPoint(-10.39f, 18.77f, {.timeout = 605, .velocityExit = 25.0f, .errorExit = 2.0f});
+    chassis.moveToPoint(-0.01f, 23.41f, {.timeout = 1072, .velocityExit = 1000.0f, .errorExit = 5.75f, .maxSpeed = 40.0f, .halfPlaneExit = 0, .async = true});
+    chassis.waitUntil(0.00f);
+    rclaw::intake();
+    rclaw::stopDriveOnObject(1200);
+    chassis.waitUntilDone();
+    skills::noteGrip(rclaw::confirmGrip(400));
+    skills::liftForGoal(dr4b::kTallGoal, 2);
+    chassis.turnToPoint(0.00f, 0.00f, {.timeout = 938, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
+    skills::reachTo(0.00f, 0.00f, skills::goalStopIn(dr4b::kTallGoal, 2), 1033);
+    skills::aimAt(0.00f, 0.00f);
+    dr4b::waitSettled(700);
+    skills::releaseOn(dr4b::kTallGoal, 2);
+    pros::delay(120);
+    chassis.moveToPoint(-4.18f, 14.61f, {.timeout = 771, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
+    chassis.waitUntil(2.80f);
+    dr4b::to(dr4b::kFloor);
+    chassis.waitUntilDone();
+    chassis.turnToPoint(-14.90f, 16.76f, {.timeout = 1026, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
+    chassis.moveToPoint(-14.90f, 16.76f, {.timeout = 901, .velocityExit = 20.0f, .errorExit = 1.5f});
+    }
+    if (skills::elapsedMs() <= skills::kMidSStartMs) {
+    chassis.turnToPoint(-18.26f, 10.14f, {.timeout = 818, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
+    chassis.moveToPoint(-18.26f, 10.14f, {.timeout = 742, .velocityExit = 25.0f, .errorExit = 2.0f});
+    chassis.moveToPoint(-23.40f, 0.00f, {.timeout = 1072, .velocityExit = 1000.0f, .errorExit = 5.75f, .maxSpeed = 40.0f, .halfPlaneExit = 0, .async = true});
+    chassis.waitUntil(0.00f);
+    rclaw::intake();
+    rclaw::stopDriveOnObject(1200);
+    chassis.waitUntilDone();
+    skills::noteGrip(rclaw::confirmGrip(400));
+    skills::liftForGoal(dr4b::kTallGoal, 2);
+    chassis.turnToPoint(0.00f, 0.00f, {.timeout = 953, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
+    skills::reachTo(0.00f, 0.00f, skills::goalStopIn(dr4b::kTallGoal, 2), 1022);
+    skills::aimAt(0.00f, 0.00f);
+    dr4b::waitSettled(700);
+    skills::releaseOn(dr4b::kTallGoal, 2);
+    pros::delay(120);
+    chassis.moveToPoint(-14.62f, 4.14f, {.timeout = 771, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
+    chassis.waitUntil(2.80f);
+    dr4b::to(dr4b::kFloor);
+    chassis.waitUntilDone();
+    chassis.turnToPoint(-10.73f, -7.80f, {.timeout = 710, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
+    chassis.moveToPoint(-10.73f, -7.80f, {.timeout = 965, .velocityExit = 20.0f, .errorExit = 1.5f});
+    } else {
+    skills::hop(-10.73f, -7.80f, 1300, 1400);
+    }
+    chassis.turnToPoint(13.06f, -18.67f, {.timeout = 652, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
     chassis.moveToPoint(13.06f, -18.67f, {.timeout = 1429, .velocityExit = 25.0f, .errorExit = 2.0f});
     chassis.moveToPoint(23.40f, -23.41f, {.timeout = 1072, .velocityExit = 1000.0f, .errorExit = 5.75f, .maxSpeed = 40.0f, .halfPlaneExit = 0, .async = true});
     chassis.waitUntil(0.00f);
@@ -269,14 +311,13 @@ void skillsDr4b() {
     rclaw::stopDriveOnObject(1200);
     chassis.waitUntilDone();
     skills::noteGrip(rclaw::confirmGrip(400));
-    pros::delay(150);
     skills::liftForGoal(dr4b::kTallGoal, 2);
     chassis.turnToPoint(0.00f, 0.00f, {.timeout = 1181, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
     skills::reachTo(0.00f, 0.00f, skills::goalStopIn(dr4b::kTallGoal, 2), 1220);
     skills::aimAt(0.00f, 0.00f);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kTallGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     if (skills::elapsedMs() > skills::kLastLegStartMs) { rclaw::hold(); return; }
     chassis.moveToPoint(9.81f, -11.61f, {.timeout = 771, .errorExit = 3.30f, .forwards = false, .minSpeed = 43.0f, .settle = false, .async = true});
     chassis.waitUntil(2.80f);
@@ -291,15 +332,14 @@ void skillsDr4b() {
     rclaw::stopDriveOnObject(1200);
     chassis.waitUntilDone();
     skills::noteGrip(rclaw::confirmGrip(400));
-    pros::delay(150);
     skills::liftForGoal(dr4b::kTallGoal, 2);
     chassis.turnToPoint(0.00f, 0.00f, {.timeout = 1233, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
     skills::reachTo(0.00f, 0.00f, skills::goalStopIn(dr4b::kTallGoal, 2), 2318);
     skills::aimAt(0.00f, 0.00f);
     dr4b::waitSettled(700);
     skills::releaseOn(dr4b::kTallGoal, 2);
-    pros::delay(200);
+    pros::delay(120);
     rclaw::hold();
 
-    // Estimated total time: 50.61 s
+    // Estimated total time: 55.74 s
 }

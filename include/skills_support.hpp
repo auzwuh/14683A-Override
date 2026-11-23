@@ -33,6 +33,11 @@ namespace skills {
 // Route v21, simulated: A takes 4.8 to 5.4 s from the Tall Goal release to its own release, B 4.7 s.
 inline uint32_t kSkipALegAfterMs = 54200;   // A, (96,96)
 inline uint32_t kLastLegStartMs = 54800;    // B, (120,120)
+// The two red Midfield Pins, 5 points each, checked at the back off point after the first Tall Goal Pin.
+// S (72,48) costs 3.0 s (it ends where the route goes next). W (48,72) costs 4.6 s and runs first, so it
+// may only start while S, A and B all still fit behind it. Past kMidSStartMs neither runs and the robot
+// goes straight on to A. Raise them only after timing real runs.
+inline uint32_t kMidWStartMs = 42300, kMidSStartMs = 47000;   // simulated: the check comes at 46.3 s on average, S runs in 3 of 4 runs
 // Checked at the Alliance Goal before each late piece. Past the limit the robot parks
 // in the Midfield instead (+8). Start values are 60 s minus the simulated time for the
 // piece and the park after it (sim-tuned drive gains). Retime from the [t] lines.
@@ -89,7 +94,7 @@ inline double kToggleUp = 38.4;   // STARTING VALUE (Pin bottom 15.7 in up, 1 in
 // computeRouteTargets() from the stacking model below, do not type them in.
 inline double kShort[6] = {NAN, NAN, NAN, NAN, NAN, NAN};     // Short Goal, placement 1..
 inline double kAlliance[6] = {NAN, NAN, NAN, NAN, NAN, NAN};  // Alliance Goal, placement 1..
-inline double kTall[3] = {NAN, NAN, NAN};                     // Tall Goal, placement 1..
+inline double kTall[5] = {NAN, NAN, NAN, NAN, NAN};                     // Tall Goal, placement 1..
 inline double kAlliance2[2] = {NAN, NAN};                     // second red Alliance Goal (48,24), placement 1..
 // Controller (volts per deg, volts per deg/s, gravity volts at the heaviest lift
 // angle, see gravityShare)
@@ -397,10 +402,10 @@ inline void printLevels() {
 inline void computeRouteTargets() {
     const std::pair<int, Held> sh[4] = {{0, kPin}, {1, kCupPin}, {3, kCupPin}, {5, kCupPin}};
     const std::pair<int, Held> al[5] = {{0, kPin}, {1, kCupPin}, {3, kCupPin}, {5, kCupPin}, {7, kCupPin}};
-    const std::pair<int, Held> ta[3] = {{0, kPin}, {1, kCupPin}, {3, kCupPin}};
+    const std::pair<int, Held> ta[5] = {{0, kPin}, {1, kCupPin}, {3, kCupPin}, {5, kCupPin}, {7, kCupPin}};
     for (int i = 0; i < 4; ++i) kShort[i] = levelAngle(kShortGoal, sh[i].first, sh[i].second);
     for (int i = 0; i < 5; ++i) kAlliance[i] = levelAngle(kAllianceGoal, al[i].first, al[i].second);
-    for (int i = 0; i < 3; ++i) kTall[i] = levelAngle(kTallGoal, ta[i].first, ta[i].second);
+    for (int i = 0; i < 5; ++i) kTall[i] = levelAngle(kTallGoal, ta[i].first, ta[i].second);
     for (int i = 0; i < 2; ++i) kAlliance2[i] = levelAngle(kAllianceGoal, al[i].first, al[i].second);
     printLevels();
 }
@@ -728,9 +733,12 @@ class WallLocalizer {
     int kCloseMv = 3000;          // creep voltage (TUNE: must start the robot rolling)
     int kCloseSlowMv = 1800;      // voltage over the last inch. It is raised by itself if the robot stalls
     double kCloseLeadIn = 0.20;   // cut the motors this far early, the robot rolls on a little (TUNE from the [close] line)
-    double kCloseFixIn = 0.08;    // ended further than this from the target: one short nudge back (or on)
-    int kCloseSamples = 6;        // front sensor readings for the wall distance (median). With 4 the reading itself was 0.2 in
-                                  // off in 2 of 64 simulated runs (3 mm of sensor noise), enough to end outside the paddle's window
+    double kCloseFixIn = 0.08;    // ended further than this from the target: a short nudge back (or on)
+    int kCloseFixes = 3;          // at most this many nudges. With one, 12 of 63 simulated runs still ended 0.09 to 0.12 in off
+                                  // and knew it, and the one that was also read 0.2 in wrong missed the Toggle (80 points)
+    int kCloseSamples = 12;       // front sensor readings for the wall distance (median), 0.36 s. With 6 the reading itself was
+                                  // 0.2 in off in 2 of 64 simulated runs (3 mm of sensor noise) and the Toggle was missed in 1.
+                                  // With 12 and kCloseFixes 3: 128 of 128 runs strike twice, gap at the paddle 0.95 to 1.28 in
     bool closeToWall(double frontIn, double gapIn, int timeoutMs = 1500) {
         pauseContinuous(true);
         chassis.cancelAllMotions();
@@ -792,12 +800,12 @@ class WallLocalizer {
         // One nudge when it ended more than kCloseFixIn off. The robot rolls 0.1 to 0.25 in past the
         // cut-off, and the Toggle paddle's window is only 0.6 in wide. Simulated: 1 run in 30 ended
         // so close that both paddle ends struck and the Toggle finished on the wrong colour.
-        if (std::fabs(off) > kCloseFixIn) {
+        int fboost = 0;   // kept from one nudge to the next: a nudge that never got the robot rolling starts the next one harder
+        for (int fix = 0; fix < kCloseFixes && std::fabs(off) > kCloseFixIn; ++fix) {
             const double fdir = off > 0.0 ? 1.0 : -1.0, from = gone * dir, need = std::fabs(off) - 0.05;
             const auto fixEnd = pros::millis() + 300;
             double lastAt = from;
             auto lastT = pros::millis();
-            int fboost = 0;
             while (pros::millis() < fixEnd) {
                 const double at = progress(chassis.getPose()) * dir;   // forward travel since the start
                 if ((at - from) * fdir >= need) break;
@@ -1029,6 +1037,12 @@ inline void parkMidfield(float bx, float by, float vx, float vy, float px, float
 inline double kReaimIn = 18.0;
 // roll: end still rolling (within 2 in, under 25 in/s) for a drive that carries straight on, like
 // the one to the lift gate.
+// Turn toward a point and drive to it, ending loosely because a turn follows. The route's branch without
+// the red Midfield Pin S uses it (gen_route.py).
+inline void hop(float x, float y, int turnMs, int moveMs) {
+    chassis.turnToPoint(x, y, {.timeout = turnMs, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
+    chassis.moveToPoint(x, y, {.timeout = moveMs, .velocityExit = 20.0f, .errorExit = 1.5f});
+}
 inline void reachTo(float x, float y, float reachIn, int timeoutMs, bool async = false, bool roll = false) {
     auto drive = [&](int timeout, bool as) {
         const arc::Pose p = chassis.getPose();

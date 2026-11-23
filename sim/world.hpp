@@ -13,7 +13,7 @@ struct Truth {
     double distOffMm[3] = {}, distScale[3] = {}; // systematic distance sensor error (truth)
     double trackS = 0;                           // tracking wheel ground travel, in
     double massKg = 5.67, yawJ = 0.10, driveFricN = 0;                       // chassis
-    double rest1Deg = -128.7, rest2Deg = -25.0, carriageKg = 1.02, midKg = 0.45, liftFricNm = 0.5, liftBandNm = 0,
+    double rest1Deg = -128.7, rest2Deg = -25.0, carriageKg = 1.02, midKg = 0.45, liftFricNm = 0.5, liftBandNm = 0, bandScale = 1.0,
            liftSlopDeg = 0, kGErr = 0;                                       // lift
     double pitch = 3.32, preloadDzIn = 0;                                    // stacking
     double grabAheadIn = 1.75, grabLatIn = 0.77, releaseFwdIn = 0.5, captureR = 1.0, releaseMs = 80;   // claw / Goal
@@ -23,7 +23,10 @@ struct Truth {
 // x, y: the TRUE robot origin = middle of the traction axle (the point the robot code calls its pose), in. th rad CW.
 // v, vl: forward and rightward speed of the CG (truth.cgFwdIn ahead of the frame centre: on the axle by default), m/s. w rad/s.
 struct Body { double x = 0, y = 0, th = 0, v = 0, w = 0, vl = 0, contact = 0; };
-struct LiftState { double a = 0, w = 0, maxDeg = 0; };                              // rad, rad/s
+struct LiftState { double a = 0, w = 0, maxDeg = 0;
+                   // the string only pulls. slack: the crank has unwound further than the lift has come down.
+                   // ca, cw = the lift angle the crank would allow, and its rate. The motor encoders read ca
+                   bool slack = false; double ca = 0, cw = 0, gapMaxDeg = 0; int slackMs = 0; };                              // rad, rad/s
 struct Counters {
     int resetApplied = 0, resetSkipped = 0, resetMountOk = 0, resetMountReject = 0, resetMountSkip = 0;
     int squares = 0, liftNotSettled = 0, gripNotSeen = 0, gripOk = 0, untunedTargets = 0, preflightMissing = 0;

@@ -191,17 +191,24 @@ constexpr double kLiftFricNm = 0.5;         // Coulomb at the lift shaft, ASSUME
 // 1.4 in off it mid stroke, so the TRUE rise follows the table. Fore-aft travel still comes from the linkage.
 constexpr double kLiftTableDeg[] = {0, 20, 40, 60, 80, 100, 103};
 constexpr double kLiftTableIn[] = {0.0, 8.3, 17.0, 25.1, 31.7, 36.1, 36.5};
-constexpr double kLiftBandNm = 3.0;         // rubber band assist at the lift shaft (constant). --lift-bands NM. ASSUMED: with the
-                                            // real 200 rpm cartridges and no bands the modelled lift stalls part way up
+constexpr double kLiftBandNm = -1.0;        // below 0 = the band model below. --lift-bands NM puts back a constant assist (was 3.0, assumed)
+// Rubber bands (Austin, 19 Nov): 6 x #64, 3 a side, from the tower to the lower stage 1 bar 9.0 in from its tower pivot
+// (hole 5, the middle joint is hole 1). He gave the stretched length at both ends of the stroke: 12.0 in folded, 6.1 in
+// at the top. kBandTowerFwdIn / UpIn (from the stage 1 tower pivot) is the one point near the tower that gives exactly
+// those two lengths. Pull per band is TYPICAL, not measured: #64 is 3.5 in flat, 1/4 x 1/32 in, two strands, rubber
+// shear modulus 0.45 MPa, so F = kBandN x (stretch - 1 / stretch^2): 15 N at 12 in, 6.4 N at 6.1 in. +-kBandSpread per
+// seed. With the ASSUMED lift masses above the six bands carry 80 to 100 % of the empty lift's weight.
+constexpr int kBandCount = 6;
+constexpr double kBandBarIn = 9.0, kBandTowerFwdIn = 0.586, kBandTowerUpIn = 3.92, kBandFlatIn = 3.5, kBandN = 4.5, kBandSpread = 0.25;
 constexpr double kLiftSlopDeg = 1.0;        // ASSUMED droop of the loaded lift below what the motor encoders say: 12T/48T and
                                             // shaft backlash, joint play, bar sag, all expressed at the lift shaft. The lift is
                                             // tared resting on its stop, so the encoders cannot see it (worst case: all of the
                                             // backlash is free at tare). 1 deg is about 0.4 in at the claw. 0 to 2 deg per
                                             // seed, --lift-slop DEG
 constexpr double kKgTuneErr = 0.15;         // kG is "raise the volts until it holds": +- this share per seed
-// String drive (Austin, 19 Nov), same numbers as dr4b:: in skills_support.hpp: crank axle from the stage 1 tower pivot,
+// Link drive (Austin, 19 and 23 Nov: a rigid 6.0 in link, it was a 5.918 in string), same numbers as dr4b:: in skills_support.hpp: crank axle from the stage 1 tower pivot,
 // crank arm, tie hole from the pivot, string length, stage 1 angle on the stop.
-constexpr double kCrankFwdIn = 0.250, kCrankDownIn = 6.750, kCrankArmIn = 2.061, kTieIn = 2.000, kStringIn = 5.918, kStage1FoldedDeg = -33.0;
+constexpr double kCrankFwdIn = 0.250, kCrankDownIn = 6.750, kCrankArmIn = 2.061, kTieIn = 2.000, kLinkIn = 6.000, kStage1FoldedDeg = -33.0;
 constexpr double kLiftTopDeg = 98.0;   // was 105.0 before the string: the stroke ends with stage 1 65 deg above level       // mechanical top stop. Final CAD, low confidence: stage 2's own bars meet at about
                                             // 105 deg (was 124, assumed). The code's kTopDeg is 100
 constexpr double kSwayHz = 3.0, kSwayZeta = 0.15, kSwayFullRiseIn = 30.0;   // ASSUMED fore-aft sway of the raised claw

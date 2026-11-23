@@ -800,7 +800,7 @@ const Knob kKnobs[] = {
     {"--imu-jitter", &Options::imuJitterMs, "imujit"},   {"--imu-b-drop", &Options::imuBDropS, "imubdrop"},
     {"--imu-phase-b", &Options::imuPhaseB, "imuphb"},
     {"--pitch", &Options::pitchIn, "pitch"},             {"--lift-err", &Options::liftErrDeg, "lifterr"},
-    {"--lift-slop", &Options::liftSlopDeg, "liftslop"},  {"--lift-bands", &Options::liftBandNm, "bands"},
+    {"--lift-slop", &Options::liftSlopDeg, "liftslop"},  {"--lift-bands", &Options::liftBandNm, "bands"}, {"--band-count", &Options::bandCount, "bandn"}, {"--rigid-string", &Options::rigidString, "rigid"},
     {"--grab-ahead", &Options::grabAheadIn, "grabahead"}, {"--grab-lat", &Options::grabLatIn, "grablat"},
     {"--release-ms", &Options::releaseMs, "relms"},      {"--release-fwd", &Options::releaseFwdIn, "relfwd"},
     {"--capture-r", &Options::captureR, "capr"},
@@ -892,7 +892,7 @@ int main(int argc, char** argv) {
                          "  scenarios: [--goal-pins] [--draw-heights] [--no-clusters] [--no-cont-track] [--no-claw-wall] [--rear IN] [--wheel-dia IN]\n"
                          "             [--imu-gain G] [--loader-x IN] [--auton-ms MS] [--imu-b-missing]\n"
                          "  truth knobs (FLAG VALUE, see sim_config.hpp): --scrub IN  --drive-fric N  --imu-jitter MS  --imu-phase-b MS  --imu-b-drop S\n"
-                         "             --pitch IN  --lift-err DEG  --lift-slop DEG  --lift-bands NM  --grab-ahead IN  --grab-lat IN\n"
+                         "             --pitch IN  --lift-err DEG  --lift-slop DEG  --lift-bands NM  --band-count N  --rigid-string 1  --grab-ahead IN  --grab-lat IN\n"
                          "             --release-ms MS  --release-fwd IN  --capture-r IN  --pivot-fwd IN  --cg-fwd IN  --paddle-deg DEG\n"
                          "  robot constants, sweep only: --flip-turns N (toggle::kFlipTurns)  --close-lead IN  --close-mv MV  --close-slow-mv MV\n"
                          "  other:     [--out DIR] [--repo DIR] [--watchdog-ms MS] [--watchdog-demo]\n");

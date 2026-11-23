@@ -35,7 +35,7 @@ struct Options {
     double imuBDropS = -1;       // IMU B dies at this sim time, s (autonomous() starts near 2.1 s)
     double imuPhaseB = -1;       // IMU B's sample phase inside the 10 ms tick (odometry reads at 0)
     bool imuBMissing = false;    // IMU B unplugged from boot
-    double pitchIn = -1, liftSlopDeg = -1, liftBandNm = -1, driveFricN = -1;
+    double pitchIn = -1, liftSlopDeg = -1, liftBandNm = -1, bandCount = -1, rigidString = -1, driveFricN = -1;
     double massKg = -1, yawJ = -1;   // tuning sweeps: true robot mass (kg) and chassis yaw inertia (kg m^2)
     double carriageKg = -1, liftFricNm = -1;   // tuning sweeps: true mass at the claw end, lift shaft friction
     float liftKp = -1, liftKd = -1, liftKi = -1, liftKgScale = 1;   // --lift-gains: sets the ROBOT's dr4b gains (sweep only)

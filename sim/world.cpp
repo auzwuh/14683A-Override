@@ -143,7 +143,7 @@ static double crankForStageDeg(double aDeg) {
     const double a = d2r(aDeg);
     const double dx = kTieIn * std::cos(a) - kCrankFwdIn, dy = -kTieIn * std::sin(a) + kCrankDownIn;
     const double d = std::hypot(dx, dy);
-    const double c = std::max(-1.0, std::min(1.0, (kCrankArmIn * kCrankArmIn + d * d - kStringIn * kStringIn) / (2.0 * kCrankArmIn * d)));
+    const double c = std::max(-1.0, std::min(1.0, (kCrankArmIn * kCrankArmIn + d * d - kLinkIn * kLinkIn) / (2.0 * kCrankArmIn * d)));
     return r2d(std::atan2(dy, dx) + std::acos(c));
 }
 static double crankTurnDeg(double liftDeg) { return crankForStageDeg(kStage1FoldedDeg + liftDeg) - crankForStageDeg(kStage1FoldedDeg); }
@@ -157,10 +157,21 @@ double liftDxIn(double deg) { return xIn(deg) - xIn(0.0); }
 // Two masses: the carriage (and object) at the claw end, which rises with both stages, and the
 // mid-stage mass at the middle pivot, which rises with stage 1 only. The robot's gravityShare()
 // assumes everything is at the claw end, so its feedforward does not match this curve.
+// Torque at the lift shaft (N m, + raises the lift) from the six rubber bands at TRUE lift angle deg. See kBand* in sim_config.hpp.
+double bandNm(double deg) {
+    if (truth.liftBandNm >= 0) return truth.liftBandNm;   // --lift-bands NM: constant
+    const double a = d2r(-180.0 - truth.rest1Deg + deg);   // stage 1 above level
+    const double px = -kBandBarIn * std::cos(a), py = kBandBarIn * std::sin(a);   // band hole on the bar, from the tower pivot (forward, up)
+    const double dx = kBandTowerFwdIn - px, dy = kBandTowerUpIn - py, len = std::hypot(dx, dy);
+    const double lam = len / kBandFlatIn;
+    if (lam <= 1.0) return 0.0;
+    const double leverIn = -(px * dy - py * dx) / len;
+    return (opt.bandCount >= 0 ? opt.bandCount : kBandCount) * truth.bandScale * kBandN * (lam - 1.0 / (lam * lam)) * leverIn * IN;
+}
 static double liftLoadNm(double deg, double objKg) {
     const double dz = (liftRiseIn(deg + 0.5) - liftRiseIn(deg - 0.5)) / d2r(1.0) * IN;   // claw end, m per rad
     const double dzMid = -kL1In * IN * std::cos(d2r(truth.rest1Deg - deg));              // middle pivot, m per rad
-    return ((truth.carriageKg + objKg) * dz + truth.midKg * dzMid) * G - truth.liftBandNm;
+    return ((truth.carriageKg + objKg) * dz + truth.midKg * dzMid) * G - bandNm(deg);
 }
 MotorDev& motor(int p) {
     static MotorDev m[32];
@@ -428,10 +439,12 @@ void worldInit() {
     truth.driveFricN = knob(opt.driveFricN, kDriveFricN * spread(0.50));
     truth.rest1Deg = kRest1Deg + opt.liftErrDeg + unif(-kLiftAngleErrDeg, kLiftAngleErrDeg);
     truth.rest2Deg = kRest2Deg + opt.liftErrDeg + unif(-kLiftAngleErrDeg, kLiftAngleErrDeg);
+    // ponytail: derived from the rest angle draw so no other per-seed value shifts. Own draw if the two must be independent
+    truth.bandScale = 1.0 + kBandSpread * (truth.rest2Deg - kRest2Deg - opt.liftErrDeg) / kLiftAngleErrDeg;
     truth.carriageKg = knob(opt.carriageKg, kCarriageKg * spread(0.10));
     truth.midKg = kMidStageKg * spread(0.30);
     truth.liftFricNm = knob(opt.liftFricNm, kLiftFricNm * spread(0.30));
-    truth.liftBandNm = knob(opt.liftBandNm, kLiftBandNm);
+    truth.liftBandNm = opt.liftBandNm >= 0 ? opt.liftBandNm : kLiftBandNm;
     truth.liftSlopDeg = knob(opt.liftSlopDeg, unif(0.0, 2 * kLiftSlopDeg));
     truth.kGErr = unif(-kKgTuneErr, kKgTuneErr);
     truth.pitch = knob(opt.pitchIn, opt.noise ? kPitch + cal * (unif(kPitch, kPitchOld) - kPitch) : kPitch);
@@ -509,7 +522,7 @@ void worldInit() {
                 "lift: rest angles %.1f / %.1f deg, carriage %.2f kg, mid-stage %.2f kg, friction %.2f N m, bands %.2f N m, slop %.2f deg, kG tuning error %+.0f %% | "
                 "stack pitch %.3f in, preload dz %+.2f in | claw: grab window lat %.2f ahead %.2f in, release %.0f ms fwd %.2f in | capture radius %.2f in",
                 truth.massKg, truth.yawJ, truth.scrubLeverIn, truth.driveFricN, truth.rest1Deg, truth.rest2Deg, truth.carriageKg, truth.midKg,
-                truth.liftFricNm, truth.liftBandNm, truth.liftSlopDeg, 100 * truth.kGErr, truth.pitch, truth.preloadDzIn, truth.grabLatIn,
+                truth.liftFricNm, bandNm(0.0), truth.liftSlopDeg, 100 * truth.kGErr, truth.pitch, truth.preloadDzIn, truth.grabLatIn,
                 truth.grabAheadIn, truth.releaseMs, truth.releaseFwdIn, truth.captureR));
     logLine(fmt("[world] timing: IMU A phase %d, IMU B phase %d (ms inside the 10 ms tick, odometry reads at 0), jitter +-%.0f ms%s | motor telemetry phase %d | "
                 "rotation sensor phase %d | autonomous() starts %d ms after initialize() returns",
@@ -1237,24 +1250,56 @@ void worldStep(uint64_t t) {
         const double dz = (liftRiseIn(deg + 0.5) - liftRiseIn(deg - 0.5)) / d2r(1.0) * IN;   // m/rad
         const double dx = (liftDxIn(deg + 0.5) - liftDxIn(deg - 0.5)) / d2r(1.0) * IN;
         const double mass = truth.carriageKg + objKg;
-        double Tm = 0, fr = truth.liftFricNm;
+        // Crank side: the two motors through 12:48 and the string, expressed at the lift shaft. While the string is
+        // slack it runs on its own (lift.ca, lift.cw), and the motor encoders follow IT, not the lift.
+        const double cw = lift.slack ? lift.cw : lift.w;
+        const double kr = kCrank * stringRatio(lift.slack ? r2d(lift.ca) : deg);   // motor turns per lift turn here
+        double Tm = 0, frm = 0, Jm = 0;
         for (int p = 0; p < 32; ++p) {
             MotorDev& m = motor(p);
             if (!m.exists || m.mech != 3) continue;
-            const double kr = kCrank * stringRatio(deg);   // motor turns per lift turn here, through the string
-            const double wm = m.mount * lift.w * kr;
+            const double wm = m.mount * cw * kr;
             Tm += m.mount * geared(motorTorque(m, wm), wm) * kr;
-            fr += motorFric(m) * kr;
+            frm += motorFric(m) * kr;
+            Jm += m.rotorJ * kr * kr;
         }
         const double Jl = mass * (dz * dz + dx * dx) + truth.midKg * (kL1In * IN) * (kL1In * IN) + kLiftArmsInertia;
-        const double net = Tm - liftLoadNm(deg, objKg);
-        if (lift.a <= 0 && lift.w <= 0 && net <= fr) { lift.a = 0; lift.w = 0; }   // resting on the bottom stop
-        else {
-            lift.w += net / Jl * dt;
-            lift.w = towardZero(lift.w, fr / Jl * dt);
-            lift.a += lift.w * dt;
+        const double load = liftLoadNm(deg, objKg);   // gravity less the bands: + pulls the lift down
+        const auto stops = [] {
             if (lift.a < 0) { lift.a = 0; lift.w = std::max(0.0, lift.w); }
             if (lift.a > d2r(kLiftTopDeg)) { lift.a = d2r(kLiftTopDeg); lift.w = std::min(0.0, lift.w); }
+        };
+        if (!lift.slack) {
+            const double fr = truth.liftFricNm + frm, net = Tm - load;
+            if (lift.a <= 0 && lift.w <= 0 && net <= fr) { lift.a = 0; lift.w = 0; }   // resting on the bottom stop
+            else {
+                double w = lift.w + net / (Jl + Jm) * dt;
+                w = towardZero(w, fr / (Jl + Jm) * dt);
+                // What the string has to supply for the lift to move like that. A string cannot push: if this is
+                // negative the motors are unwinding faster than the lift comes down (or the bands hold it up).
+                const double tension = Jl * (w - lift.w) / dt + load + (w < 0 ? -truth.liftFricNm : w > 0 ? truth.liftFricNm : 0.0);
+                if (tension < 0 && lift.a > 0 && opt.rigidString == 0) { /* only with --rigid-string 0: a string in place of the link */ lift.slack = true; lift.ca = lift.a; lift.cw = lift.w; }
+                else { lift.w = w; lift.a += w * dt; stops(); }
+            }
+        }
+        if (lift.slack) {
+            lift.w = towardZero(lift.w - load / Jl * dt, truth.liftFricNm / Jl * dt);   // the lift alone: weight, bands, its own friction
+            lift.a += lift.w * dt;
+            stops();
+            lift.cw = towardZero(lift.cw + Tm / Jm * dt, frm / Jm * dt);                 // the crank alone
+            lift.ca = std::max(d2r(-3.0), lift.ca + lift.cw * dt);
+            lift.gapMaxDeg = std::max(lift.gapMaxDeg, r2d(lift.a - lift.ca));
+            ++lift.slackMs;
+            if (lift.a <= lift.ca) {   // the string comes tight again
+                lift.w = lift.cw = (Jl * lift.w + Jm * lift.cw) / (Jl + Jm);
+                lift.ca = lift.a;
+                lift.slack = false;
+                if (lift.gapMaxDeg > 2.0)
+                    logLine(fmt("[string] was slack for %d ms: the lift hung up to %.1f deg above what the motor encoders read", lift.slackMs, lift.gapMaxDeg));
+                lift.gapMaxDeg = 0; lift.slackMs = 0;
+            } else if (lift.slackMs == 1500 && lift.gapMaxDeg > 2.0) {
+                logLine(fmt("[string] slack for 1.5 s and counting: lift at %.1f deg, the motor encoders read %.1f. The bands hold it up", r2d(lift.a), r2d(lift.ca)));
+            }
         }
         lift.maxDeg = std::max(lift.maxDeg, r2d(lift.a));
     }
@@ -1277,8 +1322,9 @@ void worldStep(uint64_t t) {
         else if (m.mech == 3) {
             // gear slop: free while the lift rests on its stop (where it is tared), taken up over the
             // first half degree of travel, so under load the motor is ahead of the arm by the slop
-            m.vel = m.mount * lift.w * kCrank * stringRatio(r2d(lift.a));
-            m.pos = m.mount * d2r(crankTurnDeg(r2d(lift.a)) + truth.liftSlopDeg * std::min(1.0, lift.a / d2r(0.5))) * kCrank;
+            const double ca = lift.slack ? lift.ca : lift.a, cwm = lift.slack ? lift.cw : lift.w;
+            m.vel = m.mount * cwm * kCrank * stringRatio(r2d(ca));
+            m.pos = m.mount * d2r(crankTurnDeg(r2d(ca)) + truth.liftSlopDeg * std::clamp(ca / d2r(0.5), 0.0, 1.0)) * kCrank;
             continue;
         } else if (m.mech == 5) m.vel = m.mount * paddle.w * kPaddleRatio;
         m.pos += m.vel * dt;

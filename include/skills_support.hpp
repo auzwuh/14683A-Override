@@ -64,14 +64,15 @@ namespace dr4b {
 // NAN means not tuned, and dr4b::to() ignores NAN targets.
 inline bool kUseMotorEncoders = true;
 // 12T to 48T: 4 lift motor degrees per degree of CRANK angle. The lift angle follows the crank
-// through the string, see crankTurnForLift() below.
+// through the link, see crankTurnForLift() below.
 inline double kMotorDegPerLiftDeg = 4.0;
 // LIFT LIMITS, in lift MOTOR degrees, zeroed with the lift resting on its stop. The driver
-// soft stops and every auton target stay inside them. From Austin's table: 412 is the top.
-inline double kBottomMotorDeg = 0.0, kTopMotorDeg = 412.0;
+// soft stops and every auton target stay inside them. With the 6.0 in link the crank runs out of
+// travel at 394 motor deg (stage 1 65 deg above level), so the top limit is a little under that.
+inline double kBottomMotorDeg = 0.0, kTopMotorDeg = 388.0;
 // The 17 Nov height table (motor deg -> height: 0 3.2, 80 11.5, 160 20.2, 240 28.3, 320 34.9, 400 39.3,
-// 412 39.7 in) is no longer used. It was for the lift before the hard stop and the string. Goal
-// levels now come from the linkage and the string geometry below, or from a measured kLiftTable.
+// 412 39.7 in) is no longer used. It was for the lift before the hard stop and the link. Goal
+// levels now come from the linkage and the link geometry below, or from a measured kLiftTable.
 inline double kLoader = 0.0;      // pickup at the rest pose, object standing on the tiles (ASSUMED)
 inline double kFloor = 0.0;       // same pickup pose for floor Cup+Pins (ASSUMED)
 // The BACK OF THE LIFT decides these two (see rearIn() below). Folded, the rear end of the upper
@@ -105,6 +106,10 @@ inline double kTolDeg = 0.75;  // STARTING VALUE (3 motor deg). The lift counts 
 // Integral, volts per deg second. 0 = off. Tune kP, kD and kG first, then add a little if the
 // lift stops a degree or two off target. It only acts inside kIZoneDeg and is capped at kIMaxV.
 inline double kI = 4.0, kIZoneDeg = 3.0, kIMaxV = 2.0;
+// Most volts the controller may use to push the lift DOWN. The rubber bands leave the lift almost
+// weightless, so it needs little, and a hard push goes straight into the link and the standoff
+// the lift rests on (near the stop the crank and the link are almost in line, which multiplies it).
+inline double kMaxDownV = 4.0;   // STARTING VALUE. Simulated: 4, 6 and 12 V give the same run time and score
 inline int kSettleMs = 60;   // waitSettled wants the lift inside kTolDeg for this long, not just passing through
 
 inline arc::MotorGroup& motors() {
@@ -112,25 +117,28 @@ inline arc::MotorGroup& motors() {
     return m;
 }
 
-// ---- String drive (Austin's numbers, 19 Nov) ----
-// The 48T gear turns a crank arm. A string runs from the far hole of that arm to hole 27 on the
-// tail of the lower stage 1 bar, in front of the bar's tower pivot. Pulling the tail down raises
-// the lift. The lift rests on a hard stop with stage 1 at kStage1FoldedDeg.
-// So the lift angle is NOT motor degrees / 4. Right at the stop the crank turns 4.6 deg per lift
-// degree, mid stroke about 0.9, and over the whole stroke 105.6 deg of crank for 98 deg of lift.
-// A string only pulls: the motors raise the lift, gravity lowers it. While the string is slack
-// the motor encoders do not show where the lift is (a rotation sensor on the stage 1 pivot would).
+// ---- Link drive (Austin's numbers, 19 and 23 Nov) ----
+// The 48T gear turns a crank arm. A RIGID LINK, 6.0 in hole to hole (13 holes), runs from the far
+// hole of that arm to hole 27 on the tail of the lower stage 1 bar, in front of the bar's tower
+// pivot. Pulling the tail down raises the lift, pushing it up lowers the lift. It was going to be
+// a string (5.918 in): a string cannot push, and with 6 rubber bands carrying most of the lift's
+// weight the simulated lift hung in the air on the way down.
+// Build the link stiff: two flat bars with the crank arm and the tail between them, bolted
+// together through spacers, or one piece of C-channel. One flat bar bows when it is pushed.
+// The lift rests on a hard stop with stage 1 at kStage1FoldedDeg.
+// So the lift angle is NOT motor degrees / 4. Right at the stop the crank turns 1.8 deg per lift
+// degree, mid stroke about 0.9, and over the whole stroke 98.6 deg of crank for 98 deg of lift.
 inline double kCrankFwdIn = 0.250, kCrankDownIn = 6.750;   // crank axle (48T centre) from the stage 1 tower pivot
-inline double kCrankArmIn = 2.061;                         // 48T centre to the string hole
+inline double kCrankArmIn = 2.061;                         // 48T centre to the link hole
 inline double kTieIn = 2.000;                              // bar's tower pivot to hole 27 (4 holes)
-inline double kStringIn = 5.918;                           // string, hole to hole, for the rest pose below
+inline double kLinkIn = 6.000;                             // link, hole to hole. MEASURE the built one
 inline double kStage1FoldedDeg = -33.0;                    // stage 1 above level, resting on the 4.35 in standoff on the crank axle
-// Crank arm angle (deg from straight forward, + up) with the string taut and stage 1 at aDeg above level.
+// Crank arm angle (deg from straight forward, + up) with stage 1 at aDeg above level.
 inline double crankForStage(double aDeg) {
     const double a = aDeg * M_PI / 180.0;
     const double dx = kTieIn * std::cos(a) - kCrankFwdIn, dy = -kTieIn * std::sin(a) + kCrankDownIn;
     const double d = std::hypot(dx, dy);
-    const double c = std::clamp((kCrankArmIn * kCrankArmIn + d * d - kStringIn * kStringIn) / (2.0 * kCrankArmIn * d), -1.0, 1.0);
+    const double c = std::clamp((kCrankArmIn * kCrankArmIn + d * d - kLinkIn * kLinkIn) / (2.0 * kCrankArmIn * d), -1.0, 1.0);
     return (std::atan2(dy, dx) + std::acos(c)) * 180.0 / M_PI;
 }
 // Crank turn from the stop (deg) for a lift angle (stage 1 turn from the stop, deg), and back.
@@ -139,7 +147,7 @@ inline double crankTurnForLift(double liftDeg) {
 }
 inline double liftForCrankTurn(double crankDeg) {
     double lo = 0.0, hi = 115.0;   // crankTurnForLift rises all the way through this range
-    if (crankDeg <= 0.0) return crankDeg / 4.6;   // below the stop only while taring, same slope as just above it
+    if (crankDeg <= 0.0) return crankDeg / 1.8;   // below the stop only while taring, same slope as just above it
     for (int i = 0; i < 40; ++i) {
         const double m = 0.5 * (lo + hi);
         (crankTurnForLift(m) < crankDeg ? lo : hi) = m;
@@ -188,7 +196,7 @@ inline void start() {
                     lastT = t;
                     const double vel = std::isfinite(prev) ? (a - prev) / 0.010 : 0.0;
                     const double v = std::clamp(kP * (t - a) - kD * vel + integral.step(t - a, 0.010, kI, kIZoneDeg, kIMaxV) +
-                                                    kG * gravityShare(a), -12.0, 12.0);
+                                                    kG * gravityShare(a), -kMaxDownV, 12.0);
                     motors().move_voltage(static_cast<int>(v * 1000.0));
                 }
             }
@@ -234,7 +242,7 @@ enum Goal { kShortGoal = 0, kAllianceGoal = 1, kTallGoal = 2 };
 enum Held { kPin = 0, kCupPin = 1 };
 // {lift angle deg, rise in}, MEASURED on the robot. Empty = the linkage below is used.
 // It is empty since 19 Nov: the 17 Nov height table was made for a lift that rested 51 deg
-// below level and turned 1 to 1 with the crank. With the rest pose at -33 deg and the string
+// below level and turned 1 to 1 with the crank. With the rest pose at -33 deg and the link
 // that table no longer fits. Fill this with 8
 // or so tape measurements once the lift is built: {lift angle from dr4b::angle(), rise of the
 // held Pin's bottom above its pickup height}.
@@ -260,7 +268,7 @@ inline double kUnitBelowPinIn = 0.0;   // both picked standing on the tiles at t
 inline double kClawBelowObjIn = 0.25;  // lowest claw part below the held object's bottom (ASSUMED)
 inline double kDropClearIn = 0.9;      // gap between the claw underside and the stack top / Goal base at release.
                                        // Must be more than the lift settle error (kTolDeg x about 0.45 in per deg)
-inline double kTopDeg = liftForCrankTurn(kTopMotorDeg / kMotorDegPerLiftDeg);   // 95 deg of lift angle at 412 motor deg (the string's stroke ends at 422)
+inline double kTopDeg = liftForCrankTurn(kTopMotorDeg / kMotorDegPerLiftDeg);   // 96 deg of lift angle at 388 motor deg (the link's stroke ends at 394)
 
 // Rise of the held object's bottom above its pickup height at lift angle th.
 inline double riseIn(double th) {
@@ -299,7 +307,7 @@ inline double rearIn(double th) {
 // peak is between where the two stages are level, not where stage 1 is level.
 // Assumes the claw end carries most of the weight.
 inline double gravityShare(double a) {
-    // rise per degree of CRANK, which is what the motors feel through the string
+    // rise per degree of CRANK, which is what the motors feel through the link
     auto slope = [](double t) {
         return (riseIn(t + 0.5) - riseIn(t - 0.5)) / std::max(0.2, crankTurnForLift(t + 0.5) - crankTurnForLift(std::max(0.0, t - 0.5)));
     };

@@ -161,14 +161,15 @@ void doNothing() {}
 }
 
 
-// The first row is what runs when nobody touches the screen
+// The first row is what runs when nobody touches the screen: nothing, so a forgotten pick in a
+// match cannot drive the skills route across the Autonomous Line. PICK Skills before a skills run.
 robot::AutonRoutineList autonRoutines = {
+    {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
     {"Skills", static_cast<robot::AutonFunc>(skillsDr4b)},
     {"Red 1 (red wall)", static_cast<robot::AutonFunc>(Auton::matchRed1)},
     {"Red 2 (audience wall)", static_cast<robot::AutonFunc>(Auton::matchRed2)},
     {"Blue 1 (blue wall)", static_cast<robot::AutonFunc>(Auton::matchBlue1)},
     {"Blue 2 (far wall)", static_cast<robot::AutonFunc>(Auton::matchBlue2)},
-    {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
 #if ARC_RAMSETE_LQR_ENABLED
     {"RAMSETE-LQR Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
     {"RAMSETE-LQR Tau Step", static_cast<robot::AutonFunc>(Auton::ramseteLqrTauTest)},
@@ -220,9 +221,23 @@ void pidTestPause() { pros::delay(500); }
 
 }
 
-void disabled() {}
+// Disabled on the field: the picked auton stays on the controller screen, so the pick can be
+// checked from the driver station before the match starts.
+void showSelectionWhileDisabled() {
+    std::size_t shown = static_cast<std::size_t>(-1);
+    while (true) {
+        const std::size_t index = autonSelector.selectedIndex();
+        if (index != shown) {
+            controller.raw().print(0, 0, "%-19.19s", index < autonRoutines.size() ? autonRoutines[index].first.c_str() : "?");
+            shown = index;
+        }
+        pros::delay(100);
+    }
+}
 
-void competition_initialize() {}
+void disabled() { showSelectionWhileDisabled(); }
+
+void competition_initialize() { showSelectionWhileDisabled(); }
 
 void Auton::boomerangTest() {
     // chassis.moveToPose(24, 24, 90, {.timeout = 2000, .velocityExit = -1, .errorExit = -1, .halfPlaneExit = false, .halfPlaneTolerance = 2});
@@ -405,12 +420,14 @@ void Auton::pidTest() {
 
 void autonomous() {
     calib::clawFromPreload();   // claw sensor value from the preload, when the code has none
-    autonSelector.runSelected(skillsDr4b);   // picked on the Brain screen: skills or one of the four match starts
+    autonSelector.runSelected(Auton::doNothing);   // picked on the Brain screen: skills or one of the four match starts
 }
 
 void opcontrol() {
     controller.raw().rumble(".");
     chassis.cancelAllMotions();  // an auton move cut off mid-run would otherwise keep fighting the sticks
+    // An auton cut off during the Toggle visit leaves the drive on HOLD (toggleVisit) or BRAKE (closeToWall)
+    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
     dr4b::target() = NAN;  // driver owns the lift, stops the auton hold loop writing to it
     dr4b::motors().set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);  // lift stays put when R1/R2 are released
     // Lift stages. Up / Down pick the stage (shown on the controller), R2 sends the lift

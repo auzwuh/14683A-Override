@@ -28,6 +28,7 @@ struct Options {
     double rearIn = -1;          // F5 scenario: true rear contact (default sim_config kRearIn)
     double wheelDia = -1;        // F8 scenario: true tracking wheel diameter
     double imuGain = -1;         // F9 scenario: true raw gain of both IMUs
+    double startX = 37.05;       // where along the red wall the robot starts (skills 37.05, match Red 1 -37.40)
     double loaderX = -1;         // F10 scenario: true |x| of the red Loaders
     double scrubIn = -1;         // sensitivity knob: turning scrub lever (default sim_config kScrubLeverIn)
     // further truth knobs, all "unset" below 0 (see kKnobs in sim_main.cpp and sim_config.hpp)

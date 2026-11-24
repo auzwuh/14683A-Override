@@ -847,6 +847,7 @@ int main(int argc, char** argv) {
         else if (a == "--rear") { const auto v = val(); opt.rearIn = std::stod(v); pass(v); }
         else if (a == "--wheel-dia") { const auto v = val(); opt.wheelDia = std::stod(v); pass(v); }
         else if (a == "--imu-gain") { const auto v = val(); opt.imuGain = std::stod(v); pass(v); }
+        else if (a == "--start-x") { const auto v = val(); opt.startX = std::stod(v); pass(v); }
         else if (a == "--loader-x") { const auto v = val(); opt.loaderX = std::stod(v); pass(v); }
         else if (a == "--imu-b-missing") { opt.imuBMissing = true; pass(); }
         else if (const Knob* k = knobFor(a)) {

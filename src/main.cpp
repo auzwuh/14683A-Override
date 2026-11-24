@@ -161,7 +161,13 @@ void doNothing() {}
 }
 
 
+// The first row is what runs when nobody touches the screen
 robot::AutonRoutineList autonRoutines = {
+    {"Skills", static_cast<robot::AutonFunc>(skillsDr4b)},
+    {"Red 1 (red wall)", static_cast<robot::AutonFunc>(Auton::matchRed1)},
+    {"Red 2 (audience wall)", static_cast<robot::AutonFunc>(Auton::matchRed2)},
+    {"Blue 1 (blue wall)", static_cast<robot::AutonFunc>(Auton::matchBlue1)},
+    {"Blue 2 (far wall)", static_cast<robot::AutonFunc>(Auton::matchBlue2)},
     {"Do Nothing", static_cast<robot::AutonFunc>(Auton::doNothing)},
 #if ARC_RAMSETE_LQR_ENABLED
     {"RAMSETE-LQR Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
@@ -204,6 +210,7 @@ void initialize() {
     dr4b::computeRouteTargets();   // fills the Goal angles from the stacking model
     calib::load();   // IMU scales and distance sensor offsets the robot measured itself (auto_calib.hpp)
     rclaw::sensor();  // wake the claw sensor now, autonomous() reads the preload through it straight away
+    autonSelector.start();   // auton list on the Brain screen
     if (preflight() > 0) controller.raw().rumble("---");  // long buzz = auton is missing tuned values, read the terminal
 }
 
@@ -397,9 +404,8 @@ void Auton::pidTest() {
 }
 
 void autonomous() {
-    // Skills only for now. Runs the ATTICUS skills route directly, no selector.
     calib::clawFromPreload();   // claw sensor value from the preload, when the code has none
-    skillsDr4b();
+    autonSelector.runSelected(skillsDr4b);   // picked on the Brain screen: skills or one of the four match starts
 }
 
 void opcontrol() {

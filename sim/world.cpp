@@ -510,7 +510,7 @@ void worldInit() {
     const double sd = std::fabs(std::sin(d2r(th)));
     const double cs = std::fabs(std::cos(d2r(th))), lr = liftRearIn(true);   // the folded lift is behind the frame
     const double cy = kHalf - std::max(truth.rearIn * cs + kHalfWidthIn * sd, lr * cs + kLiftHalfWIn * sd) - 0.01 - (opt.noise ? unif(0, kStartGapIn) : 0.0);
-    body.x = 37.05 + unif(-kStartXYIn, kStartXYIn);
+    body.x = opt.startX + unif(-kStartXYIn, kStartXYIn);
     body.y = cy + kAxleFwdIn * std::cos(d2r(th));
     body.th = d2r(th);
     // drawn last, so every other per-seed value is the same as before the Toggle spinner existed

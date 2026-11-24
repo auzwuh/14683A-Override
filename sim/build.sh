@@ -13,7 +13,7 @@ REPO_W="$(cygpath -m "$REPO" 2>/dev/null || echo "$REPO")"
 CXXFLAGS="-std=gnu++20 -O2 -g0 -w -I$REPO/include -I$REPO/src -I$SIM -include $SIM/sim_printf.h"
 
 # robot code, unchanged (GenSelector replaced by selector_stub.cpp, it needs LVGL)
-ROBOT=( "$REPO"/src/main.cpp "$REPO"/src/skills_dr4b.cpp "$REPO"/src/gen/*.cpp "$REPO"/src/gen/chassis/*.cpp "$REPO"/src/gen/path_following/*.cpp )
+ROBOT=( "$REPO"/src/main.cpp "$REPO"/src/skills_dr4b.cpp "$REPO"/src/match_autons.cpp "$REPO"/src/gen/*.cpp "$REPO"/src/gen/chassis/*.cpp "$REPO"/src/gen/path_following/*.cpp )
 SIMSRC=( "$SIM"/pros_sim.cpp "$SIM"/pros_stubs_gen.cpp "$SIM"/world.cpp "$SIM"/sim_main.cpp "$SIM"/sim_selftest.cpp "$SIM"/selector_stub.cpp )
 
 pids=(); objs=()

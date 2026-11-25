@@ -33,11 +33,12 @@ namespace skills {
 // Route v21, simulated: A takes 4.8 to 5.4 s from the Tall Goal release to its own release, B 4.7 s.
 inline uint32_t kSkipALegAfterMs = 54200;   // A, (96,96)
 inline uint32_t kLastLegStartMs = 54800;    // B, (120,120)
-// The two red Midfield Pins, 5 points each, checked at the back off point after the first Tall Goal Pin.
-// S (72,48) costs 3.0 s (it ends where the route goes next). W (48,72) costs 4.6 s and runs first, so it
-// may only start while S, A and B all still fit behind it. Past kMidSStartMs neither runs and the robot
-// goes straight on to A. Raise them only after timing real runs.
-inline uint32_t kMidWStartMs = 42300, kMidSStartMs = 47000;   // simulated: the check comes at 46.3 s on average, S runs in 3 of 4 runs
+// The two red Midfield Pins, 5 points each. Three ways on from the first Tall Goal Pin (gen_route.py):
+// both red Pins if that Pin is released by kMidWStartMs, else S (72,48) alone if the robot is at the back off
+// point by kMidSStartMs, else neither. Each limit leaves room for A and B (10 points each) behind it.
+// Simulated: the Pin is released at 43.6 s on average, both red Pins then take 5.5 s more than none, S alone 2.9 s.
+// Raise the limits only after timing real runs.
+inline uint32_t kMidWStartMs = 44500, kMidSStartMs = 47500;
 // Checked at the Alliance Goal before each late piece. Past the limit the robot parks
 // in the Midfield instead (+8). Start values are 60 s minus the simulated time for the
 // piece and the park after it (sim-tuned drive gains). Retime from the [t] lines.
@@ -423,6 +424,9 @@ namespace toggle {
 inline double kMotorTurnsPerPaddleTurn = 18.0 / 8.0;   // CHECK the real sprockets
 inline double kFlipTurns = 2.0;   // paddle turns per skills visit (TUNE until the Toggle ends red; yellow to red is 2 steps)
 inline int kRpm = 200;            // 5.5 W motor speed. Flip the port signs if it spins the wrong way
+inline double kFlipReturnTurns = 1.75;   // flip() hands back control once the paddle has turned this far and lets it park
+                                        // by itself while the robot backs away. The second strike is at 1.44 to 1.54 turns.
+                                        // Set it to kFlipTurns to wait for the whole spin again
 inline pros::MotorGroup& motors() {
     static pros::MotorGroup m({skills_ports::kToggleLeft, skills_ports::kToggleRight});
     static const bool held = (m.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD), true);  // a stopped paddle stays parked
@@ -441,14 +445,15 @@ inline void flip() {
     motors().tare_position_all();
     motors().move_relative(deg, kRpm);
     const auto end = pros::millis() + static_cast<uint32_t>(2000.0 * std::fabs(deg) / (kRpm * 6.0)) + 200;
+    const double early = std::max(0.0, kFlipTurns - kFlipReturnTurns) * kMotorTurnsPerPaddleTurn * 360.0;
     // Every motor that answers has to finish. The two are not linked, so the loaded one lags.
     auto done = [&] {
         for (double p : motors().get_position_all())
-            if (std::isfinite(p) && std::fabs(p - deg) > 15.0) return false;
+            if (std::isfinite(p) && std::fabs(p - deg) > 15.0 + early) return false;
         return true;
     };
     while (pros::millis() < end && !done()) pros::delay(10);
-    motors().brake();
+    if (early <= 0.0) motors().brake();   // returned early: the motor runs on to its target and holds there
     const auto pos = motors().get_position_all();
     std::printf("[t %5.2f] toggle spun L %.0f R %.0f of %.0f motor deg\n", skills::elapsedMs() / 1000.0,
                 pos.size() > 0 ? pos[0] : NAN, pos.size() > 1 ? pos[1] : NAN, deg);
@@ -675,6 +680,7 @@ class WallLocalizer {
     // Same as above, named differently so ATTICUS keeps it where it is placed
     // in a node's action list instead of moving it to the node arrival.
     void resetNow() { applyImmediateCorrectionAuto(); }
+    bool busy() const { return busy_; }   // a stop reset is still sampling
 
     // ---------------- continuous tracking
     void startContinuous() {
@@ -1159,7 +1165,8 @@ inline void toggleVisit(double frontIn, double gapIn) {
         return;
     }
     localizer.resetNow();
-    pros::delay(300);
+    pros::delay(20);
+    for (int i = 0; i < 28 && localizer.busy(); ++i) pros::delay(10);   // was a fixed 300 ms, the fix takes 130 to 270
     leftDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
     rightDrive.set_brake_mode_all(pros::E_MOTOR_BRAKE_HOLD);
     localizer.closeToWall(frontIn, gapIn);

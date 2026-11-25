@@ -11,5 +11,9 @@ void matchRed1();
 void matchRed2();
 void matchBlue1();
 void matchBlue2();
+void matchRed1Wall();
+void matchRed2Wall();
+void matchBlue1Wall();
+void matchBlue2Wall();
 
 }

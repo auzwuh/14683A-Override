@@ -410,6 +410,9 @@ void buildField() {
         o.name = fmt("diag Cup+Pin (%g,%g)", c.first, c.second); o.units = 2; o.state = kStanding;
         objs.push_back(o);
     }
+    // wall stack behind the red Alliance Goal G2: the middle Cup + yellow Pin can be taken. Its two neighbour Cups stay
+    // beam targets, the claw wedging between them is NOT modelled.
+    { Obj o; P(1.58, 48.0, o.x, o.y); o.name = "wall stack Cup+Pin (0,48)"; o.units = 2; o.state = kStanding; objs.push_back(o); }
     // preload, held
     { Obj o; o.name = "preload Pin"; o.units = 1; o.x = o.y = 0; o.state = kHeld; o.dz = truth.preloadDzIn; objs.push_back(o); heldObj = (int)objs.size() - 1; }
     // red Loaders: top (+x) 3 Cup+Pin then a bare Pin, bottom (-x) 2 Cup+Pin then a bare Pin

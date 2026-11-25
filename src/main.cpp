@@ -170,6 +170,10 @@ robot::AutonRoutineList autonRoutines = {
     {"Red 2 (audience wall)", static_cast<robot::AutonFunc>(Auton::matchRed2)},
     {"Blue 1 (blue wall)", static_cast<robot::AutonFunc>(Auton::matchBlue1)},
     {"Blue 2 (far wall)", static_cast<robot::AutonFunc>(Auton::matchBlue2)},
+    {"Red 1 + wall stack", static_cast<robot::AutonFunc>(Auton::matchRed1Wall)},
+    {"Red 2 + wall stack", static_cast<robot::AutonFunc>(Auton::matchRed2Wall)},
+    {"Blue 1 + wall stack", static_cast<robot::AutonFunc>(Auton::matchBlue1Wall)},
+    {"Blue 2 + wall stack", static_cast<robot::AutonFunc>(Auton::matchBlue2Wall)},
 #if ARC_RAMSETE_LQR_ENABLED
     {"RAMSETE-LQR Test", static_cast<robot::AutonFunc>(Auton::ramseteLqrTestRoutine)},
     {"RAMSETE-LQR Tau Step", static_cast<robot::AutonFunc>(Auton::ramseteLqrTauTest)},

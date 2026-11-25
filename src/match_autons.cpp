@@ -70,12 +70,21 @@ constexpr float kToggleX = -3.00f;                    // where the robot stands 
 constexpr float kPreGapY = 60.20f;                    // front rails 3.5 in off the wall, toggleVisit() closes the rest
 constexpr float kOffWallY = 55.00f;                   // clear of the wall and the Toggle when the 15 s end
 constexpr float kCupX = -46.80f, kCupY = 46.80f;      // corner Cup + yellow Pin (24,24), on the line between our two Quadrants
+constexpr float kWallCupX = -23.40f, kWallCupY = 68.66f;   // wall stack behind the Alliance Goal: the middle Cup, with the yellow Pin
+constexpr float kWallBackOffIn = 5.5f;                // back off the Goal this far, then turn at the wall stack. Further back the robot comes
+                                                      // in flatter to the wall (36 deg off square from here) and its front corner meets the wall sooner
+constexpr float kWallStageIn = 11.5f;                 // fast up to here from the Cup, then the creep
+constexpr float kWallOutX = -31.45f, kWallOutY = 57.65f;   // back out of the wall stack to here, on the line it came in on and on the
+                                                      // wall lane. About 1 in spare to the Cups in the turn and to the Goal base on the lane: at y 58.0 the
+                                                      // front corner brushed the Cups, at 57.3 the side passed the Goal base by 0.2 in (simulated)
+constexpr float kWallOffY = 50.00f;                   // back off the Toggle to here before turning at the Goal with the wall Cup + Pin
 constexpr float kBackOffIn = 8.0f;                    // straight back off the Goal before steering (its base is between the rails)
 
-void run(bool mirror, bool isBlue) {
+void run(bool mirror, bool isBlue, bool wallStack = false) {
     mirrored = mirror;
     blue = isBlue;
     const Pt start = at(kStartX, kStartY), pull = at(kStartX, kPullY), goal = at(kGoalX, kGoalY), cup = at(kCupX, kCupY);
+    const Pt wallCup = at(kWallCupX, kWallCupY), wallOut = at(kWallOutX, kWallOutY), wallOff = at(kToggleX, kWallOffY);
     const Pt laneIn = at(kLaneInX, kLaneY), lane = at(kToggleX, kLaneY), pre = at(kToggleX, kPreGapY), offWall = at(kToggleX, kOffWallY);
     const auto alliance = dr4b::kAllianceGoal;
 
@@ -122,17 +131,51 @@ void run(bool mirror, bool isBlue) {
         pros::delay(120);
         // straight back off the Goal, its base is between the rails
         const arc::Pose p = chassis.getPose();
-        const float d = std::hypot(p.x - goal.x, p.y - goal.y), k = d > 1.0f ? kBackOffIn / d : 0.0f;
+        const float d = std::hypot(p.x - goal.x, p.y - goal.y), k = d > 1.0f ? (wallStack ? kWallBackOffIn : kBackOffIn) / d : 0.0f;
         chassis.moveToPoint(p.x + (p.x - goal.x) * k, p.y + (p.y - goal.y) * k,
-                            {.timeout = 700, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false});
+                            {.timeout = 700, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
+        chassis.waitUntil(2.5f);
+        if (wallStack) dr4b::to(dr4b::kFloor);
+        chassis.waitUntilDone();
     }
+
+    // 2b. Wall stack (only on the "+ wall stack" rows). The three Cups touch, the claw wedges in on the
+    // middle one and the claw sensor stops the creep. The robot comes in at an angle: square to the
+    // wall it would have to turn between the stack and the Goal, and there is no room for that.
+    // The claw has to reach past the front rails for this (it does on the robot, Austin 25 Nov).
+    if (wallStack) {
+        chassis.turnToPoint(wallCup.x, wallCup.y, {.timeout = 900, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
+        {
+            const arc::Pose p = chassis.getPose();
+            const float d = std::hypot(p.x - wallCup.x, p.y - wallCup.y), k = d > kWallStageIn ? kWallStageIn / d : 1.0f;
+            chassis.moveToPoint(wallCup.x + (p.x - wallCup.x) * k, wallCup.y + (p.y - wallCup.y) * k, {.timeout = 900, .velocityExit = 25.0f, .errorExit = 2.0f});
+        }
+        chassis.moveToPoint(wallCup.x, wallCup.y, {.timeout = 1072, .velocityExit = 1000.0f, .errorExit = 5.75f, .maxSpeed = 40.0f, .halfPlaneExit = 0, .async = true});
+        chassis.waitUntil(0.0f);
+        rclaw::intake();
+        rclaw::stopDriveOnObject(1200);
+        chassis.waitUntilDone();
+        skills::noteGrip(rclaw::confirmGrip(400));
+        // Back out onto the wall lane, lift up to the Toggle height on the way. The Cup + Pin stays in
+        // the claw through the Toggle visit and is placed after it: the Toggle is worth 30 points, this
+        // Cup + Pin 10, so the Toggle goes first and a late placement only loses its own 10.
+        // (Placed before the Toggle, the Toggle was not finished at 15 s in 6 of 32 simulated runs.)
+        chassis.moveToPoint(wallOut.x, wallOut.y, {.timeout = 800, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
+        chassis.waitUntil(3.0f);
+        dr4b::to(dr4b::kToggleUp);
+        chassis.waitUntilDone();
+        dr4b::waitSettled(500);   // next to the wall the lift is low or above 35 deg before the robot turns
+    }
+    const bool carried = wallStack && skills::holding;   // the wall Cup + Pin is in the claw
 
     // 3. Toggle. Lift up to kToggleUp first: next to a wall the lift is low or above 35 deg.
     // Stop and turn onto the lane. Rolled through as one curve the robot swung 2 in wide and its
     // side went through the wall stack Cups in every simulated run.
     dr4b::to(dr4b::kToggleUp);
-    chassis.turnToPoint(laneIn.x, laneIn.y, {.timeout = 800, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
-    chassis.moveToPoint(laneIn.x, laneIn.y, {.timeout = 900, .velocityExit = 20.0f, .errorExit = 1.0f});
+    if (!wallStack) {
+        chassis.turnToPoint(laneIn.x, laneIn.y, {.timeout = 800, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
+        chassis.moveToPoint(laneIn.x, laneIn.y, {.timeout = 900, .velocityExit = 20.0f, .errorExit = 1.0f});
+    }
     chassis.turnToPoint(lane.x, lane.y, {.timeout = 900, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
     chassis.moveToPoint(lane.x, lane.y, {.timeout = 1700, .velocityExit = 20.0f, .errorExit = 1.5f});
     chassis.turnToHeading(hdg(0.0f), {.timeout = 899, .velocityExit = 10.0f, .errorExit = 1.5f, .settleTimeMs = 80});
@@ -141,7 +184,26 @@ void run(bool mirror, bool isBlue) {
     std::printf("[t %5.2f] Toggle done\n", skills::elapsedMs() / 1000.0);
     // Off the wall and off the Toggle: a Toggle a robot touches is not set (SC4), and the Win Point
     // needs the robot off the Field Perimeter (SC8)
-    chassis.moveToPoint(offWall.x, offWall.y, {.timeout = 700, .forwards = false});
+    if (!carried) {
+        chassis.moveToPoint(offWall.x, offWall.y, {.timeout = 700, .forwards = false});
+    } else {
+        // 4. The wall Cup + Pin onto the Alliance Goal, third level, from the Toggle side
+        chassis.moveToPoint(wallOff.x, wallOff.y, {.timeout = 800, .velocityExit = 20.0f, .errorExit = 1.5f, .forwards = false, .async = true});
+        chassis.waitUntil(4.0f);
+        skills::liftForGoal(alliance, 2);
+        chassis.waitUntilDone();
+        chassis.turnToPoint(goal.x, goal.y, {.timeout = 1100, .velocityExit = 60.0f, .errorExit = 3.0f, .settleTimeMs = 0});
+        skills::reachTo(goal.x, goal.y, skills::goalStopIn(alliance, 2) + 4.0f, 1000, false, true);
+        skills::liftGate(700);
+        skills::reachTo(goal.x, goal.y, skills::goalStopIn(alliance, 2), 700);
+        skills::aimAt(goal.x, goal.y, 1.5);
+        dr4b::waitSettled(700);
+        skills::releaseOn(alliance, 2);
+        pros::delay(120);
+        const arc::Pose p = chassis.getPose();
+        const float d = std::hypot(p.x - goal.x, p.y - goal.y), k = d > 1.0f ? kBackOffIn / d : 0.0f;
+        chassis.moveToPoint(p.x + (p.x - goal.x) * k, p.y + (p.y - goal.y) * k, {.timeout = 700, .forwards = false});
+    }
     rclaw::hold();
     std::printf("[t %5.2f] match auton done\n", skills::elapsedMs() / 1000.0);
 }
@@ -153,4 +215,9 @@ void matchRed1() { run(false, false); }    // red, back on the red wall
 void matchRed2() { run(true, false); }     // red, back on the audience wall
 void matchBlue1() { run(false, true); }    // blue, back on the blue wall
 void matchBlue2() { run(true, true); }     // blue, back on the far wall
+// The same four, plus the wall stack behind the Alliance Goal: grabbed before the Toggle, placed after it. 40 points
+void matchRed1Wall() { run(false, false, true); }
+void matchRed2Wall() { run(true, false, true); }
+void matchBlue1Wall() { run(false, true, true); }
+void matchBlue2Wall() { run(true, true, true); }
 }  // namespace Auton

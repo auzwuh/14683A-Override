@@ -128,7 +128,10 @@ constexpr double kHalfWidthIn = 6.8;    // 13.6 in wide frame
 // ponytail: the V is modelled as a flat edge that stops the base at the same place on the centre line, it
 // does not centre a base that comes in off line. Model the two V edges if off-line seating matters.
 constexpr double kNotchHalfWIn = 4.20;
-constexpr double kNotchFlatIn = 4.72 + 1.5 - 3.22;   // frame centre to that flat edge (kAxleFwdIn = 1.5, kGoalR = 3.22)
+// 25 Nov: the V plate is replaced by two round aligner pieces that seat the base 6.70 in ahead of the axle (was 4.72).
+// Still a flat edge here. The real pieces are a 5.11 in radius arc: by the field drawing the Loader chute corners clear
+// them by 0.45 in at the grab stop.
+constexpr double kNotchFlatIn = 6.70 + 1.5 - 3.22;   // frame centre to that flat edge (kAxleFwdIn = 1.5, kGoalR = 3.22)
 constexpr double kContactK = 50000.0;   // N/m penalty contact
 constexpr double kContactC = 500.0;     // N s/m, approach only
 

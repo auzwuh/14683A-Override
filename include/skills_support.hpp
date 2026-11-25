@@ -1097,7 +1097,11 @@ inline double kClawReachIn = 6.5;    // robot origin to the held object's centre
                                      // ahead of the origin), the claw is not in the CAD. MEASURE. Same as S_LOAD_IN in gen_route.py
 inline double kPlaceCarryIn = 0.4;   // how far past the claw centre a released object lands, the rollers throw it forward.
                                      // ASSUMED from the simulator. MEASURE: place 5 times, see how far past the post it lands
-inline double kGoalMinIn = 5.0;      // closest the origin may come to a Goal centre (4.72 seats the base in the notch)
+inline double kGoalMinIn = 6.70;     // closest the origin may come to a Goal centre: where the base seats in the aligner.
+                                     // 25 Nov aligner (two round pieces): the base (r 3.22) rests on the two inner corners.
+                                     // Drawn at 7.12, moved back 0.42 in: the tallest stacks need the Goal this close (4th on the
+                                     // Tall Goal 6.70, 4th on the Short Goal 6.89) and missed at 7.12 (simulated). Was 5.0 with the
+                                     // V plate (seat 4.72). MEASURE on the robot. Same as GOAL_MIN_IN in gen_route.py
 inline double kEmptyStopIn = 14.0;   // with nothing in the claw, stop this far out so the low claw stays off the stack
 
 inline void resetGoals() { onGoal[0] = onGoal[1] = onGoal[2] = onGoal[3] = 0; holding = true; }   // start of a run
